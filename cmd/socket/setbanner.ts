@@ -4,6 +4,7 @@ import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { clearMenuMediaCache } from "./menu.ts";
 
 function unwrapMedia(
   message: proto.IMessage | null | undefined,
@@ -36,8 +37,22 @@ export default {
     }
 
     try {
+      const downloadTarget = quotedMessage
+        ? {
+            key: {
+              remoteJid: context?.remoteJid || ctx.from,
+              id: context?.stanzaId,
+              participant: context?.participant,
+            },
+            message: target,
+          }
+        : {
+            key: ctx.msg.key,
+            message: target,
+          };
+
       const buffer = await downloadMediaMessage(
-        { key: ctx.msg.key, message: target },
+        downloadTarget as import("@whiskeysockets/baileys").WAMessage,
         "buffer",
         {},
         {
@@ -65,22 +80,26 @@ export default {
           : mimetype.includes("png")
             ? "png"
             : "jpg";
+      const botKey = String(ctx.botJid || "main").replace(/[^a-zA-Z0-9]/g, "_");
       const filePath = path.join(
         databaseDir,
-        `banner-${randomUUID()}.${extension}`,
+        `banner-${botKey}.${extension}`,
       );
       await writeFile(filePath, buffer);
 
       const bot = ctx.db.getBot(ctx.botJid);
       const previousPath = (
-        bot?.data?.customBanner as { path?: string } | undefined
-      )?.path;
+        (bot?.data?.customBanner as { path?: string } | undefined)?.path ||
+        (bot?.customBanner as { path?: string } | undefined)?.path
+      );
       if (previousPath && previousPath !== filePath) {
         await unlink(previousPath).catch(() => undefined);
       }
       ctx.db.setBot(ctx.botJid, {
+        customBanner: { path: filePath, mimetype },
         data: { customBanner: { path: filePath, mimetype } },
       });
+      clearMenuMediaCache();
       return ctx.reply("✅ Banner del menú actualizado.");
     } catch (error: unknown) {
       return ctx.reply({

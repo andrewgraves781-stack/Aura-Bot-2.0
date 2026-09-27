@@ -18,8 +18,21 @@ export function getActiveSubBots(): ExtendedWASocket[] {
   return [...activeSubBots.values()];
 }
 
-export function forgetActiveSubBot(sessionName: string) {
+function cleanSubBot(sessionName: string) {
+  const socket = activeSubBots.get(sessionName);
+  if (socket) {
+    try {
+      (socket.ev as unknown as { destroy?: () => void })?.destroy?.();
+      void socket.end?.(undefined);
+    } catch {
+      // Ignorar errores al cerrar socket del subbot
+    }
+  }
   activeSubBots.delete(sessionName);
+}
+
+export function forgetActiveSubBot(sessionName: string) {
+  cleanSubBot(sessionName);
 }
 
 export async function requestSubBotLink(request: LinkRequest) {
@@ -52,17 +65,17 @@ export async function requestSubBotLink(request: LinkRequest) {
     onPairingCode: request.onPairingCode,
     onConnected: request.onConnected,
     onPairingError: async (error) => {
-      activeSubBots.delete(sessionName);
+      cleanSubBot(sessionName);
       db.deleteBot(sessionName);
       await request.onPairingError?.(error);
     },
     onPairingExpired: () => {
-      activeSubBots.delete(sessionName);
+      cleanSubBot(sessionName);
       db.deleteBot(sessionName);
       return request.onPairingExpired?.();
     },
     onDisconnected: () => {
-      activeSubBots.delete(sessionName);
+      cleanSubBot(sessionName);
     },
   };
 
@@ -90,7 +103,7 @@ export async function startSavedSubBots() {
         activeSubBots.set(sessionName, socket);
       },
       onDisconnected: () => {
-        activeSubBots.delete(sessionName);
+        cleanSubBot(sessionName);
       },
     });
     if (connection) activeSubBots.set(sessionName, connection);

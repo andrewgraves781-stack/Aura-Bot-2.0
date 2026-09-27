@@ -35,6 +35,7 @@ db_instance.pragma("synchronous = NORMAL");
 db_instance.pragma("foreign_keys = ON");
 db_instance.pragma("wal_checkpoint = 1000");
 db_instance.pragma("busy_timeout = 2000");
+db_instance.pragma("cache_size = -4000");
 
 db_instance.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -146,6 +147,9 @@ const stmts = {
     "SELECT jid, bot_id, bot_name, phone_number, lid, groups, isMain, status, modPrefix, modSelf, data FROM bots",
   ),
   deleteBot: db_instance.prepare("DELETE FROM bots WHERE jid = ?"),
+  resetGroupTopMsgUsers: db_instance.prepare(
+    "UPDATE groups SET topMsgUsers = '[]' WHERE jid = ?",
+  ),
 };
 
 function normalizeJid(input: string) {
@@ -189,6 +193,8 @@ function getCurrentMessageWeek(date = new Date()): string {
   return `${current.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
+const userStmtCache = new Map<string, ReturnType<typeof db_instance.prepare>>();
+
 function getUserRow(input: string, lid?: string | null): UserDbRow | undefined {
   const rawInput = String(input || "").trim();
   const key = normalizeJid(rawInput);
@@ -203,9 +209,14 @@ function getUserRow(input: string, lid?: string | null): UserDbRow | undefined {
     values.push(lid);
   }
 
-  return db_instance
-    .prepare(`SELECT * FROM users WHERE ${conditions.join(" OR ")} LIMIT 1`)
-    .get(...values) as UserDbRow | undefined;
+  const queryKey = conditions.join(" OR ");
+  let stmt = userStmtCache.get(queryKey);
+  if (!stmt) {
+    stmt = db_instance.prepare(`SELECT * FROM users WHERE ${queryKey} LIMIT 1`);
+    userStmtCache.set(queryKey, stmt);
+  }
+
+  return (stmt as any).get(...values) as UserDbRow | undefined;
 }
 
 function getUser(input: string): DatabaseUser {
@@ -316,9 +327,7 @@ function getGroup(jid: string): DatabaseGroup {
     storedTopMsgUsers.length > 0 &&
     storedTopMsgUsers.some((user) => user?.week !== currentWeek);
   if (hasPreviousWeek) {
-    db_instance
-      .prepare("UPDATE groups SET topMsgUsers = '[]' WHERE jid = ?")
-      .run(key);
+    stmts.resetGroupTopMsgUsers.run(key);
   }
 
   return {
@@ -805,5 +814,13 @@ export const db: IDatabase = {
     this.setUser(jid, { is_banned: 0, banned: false });
   },
 };
+
+export function checkpointDb() {
+  try {
+    db_instance.pragma("wal_checkpoint(PASSIVE)");
+  } catch {
+    // Ignora errores si la base de datos está ocupada
+  }
+}
 
 db.syncDefaultUserRoles();

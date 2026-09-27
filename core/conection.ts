@@ -250,8 +250,13 @@ export async function connectToWhatsApp(
       pairingExpired = true;
       try {
         (
-          extendedSock.ev as unknown as { removeAllListeners: () => void }
+          extendedSock.ev as unknown as {
+            removeAllListeners: () => void;
+            destroy?: () => void;
+          }
         ).removeAllListeners();
+        (extendedSock.ev as unknown as { destroy?: () => void }).destroy?.();
+        void extendedSock.end?.(undefined);
         extendedSock.ws?.close();
       } catch {
         // La sesión ya puede haberse cerrado al expirar el código.
@@ -395,8 +400,13 @@ export async function connectToWhatsApp(
     if (extendedSock.manualLogout) {
       try {
         (
-          extendedSock.ev as unknown as { removeAllListeners: () => void }
+          extendedSock.ev as unknown as {
+            removeAllListeners: () => void;
+            destroy?: () => void;
+          }
         ).removeAllListeners();
+        (extendedSock.ev as unknown as { destroy?: () => void }).destroy?.();
+        void extendedSock.end?.(undefined);
         closeAuthState();
       } catch {
         // La sesión puede haberse cerrado antes de ejecutar la limpieza.
@@ -428,17 +438,6 @@ export async function connectToWhatsApp(
       return;
     }
 
-    try {
-      (
-        sock.ev as unknown as { removeAllListeners: () => void }
-      ).removeAllListeners();
-    } catch (error) {
-      connectionLog(
-        `Error al remover oyentes del socket: ${String(error)}`,
-        "error",
-      );
-    }
-
     const error = u.lastDisconnect?.error as
       | (Error & { output?: { statusCode?: number }; statusCode?: number })
       | undefined;
@@ -449,6 +448,22 @@ export async function connectToWhatsApp(
       error?.statusCode ??
       0;
     const errorMessage = error?.message || "Error desconocido";
+
+    try {
+      (
+        sock.ev as unknown as {
+          removeAllListeners: () => void;
+          destroy?: () => void;
+        }
+      ).removeAllListeners();
+      (sock.ev as unknown as { destroy?: () => void }).destroy?.();
+      void sock.end?.(error);
+    } catch (cleanupErr) {
+      connectionLog(
+        `Aviso al limpiar socket desconectado: ${String(cleanupErr)}`,
+        "warn",
+      );
+    }
 
     try {
       closeAuthState();

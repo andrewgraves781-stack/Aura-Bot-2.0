@@ -60,23 +60,21 @@ function getMessageWeek(date = new Date()): string {
   return `${current.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-const GROUP_METADATA_CACHE = new LRUCache<string, GroupMetadata>({
-  max: 500,
-  ttl: 10 * 60 * 1000,
-});
-
-const CONTACT_METADATA_CACHE = new LRUCache<string, ContactMetadata>({
-  max: 2000,
+const groupCache = new LRUCache<string, GroupMetadata>({
+  max: 150,
   ttl: 5 * 60 * 1000,
 });
 
-const groupCache = new LRUCache<string, GroupMetadata>({
+const GROUP_METADATA_CACHE = groupCache;
+
+const CONTACT_METADATA_CACHE = new LRUCache<string, ContactMetadata>({
   max: 500,
-  ttl: 10 * 60 * 1000,
+  ttl: 5 * 60 * 1000,
 });
+
 const configuredLidCache = new LRUCache<string, string | null>({
-  max: 500,
-  ttl: 60 * 60 * 1000,
+  max: 200,
+  ttl: 30 * 60 * 1000,
 });
 
 function stripDeviceSuffixFromJid(jid?: string | null): string | null {
@@ -237,6 +235,7 @@ export async function getGroupMetadata(
 
 export function invalidateGroupCache(groupJid: string) {
   groupCache.delete(groupJid);
+  groupCache.delete(jidNormalizedUser(groupJid));
 }
 
 async function resolveLid(

@@ -14,6 +14,10 @@ type CachedMediaMessage =
 
 const mediaCacheMap = new Map<string, CachedMediaMessage>();
 
+export function clearMenuMediaCache() {
+  mediaCacheMap.clear();
+}
+
 function getCommandCategories() {
   const dirs = readdirSync(path.resolve("./cmd"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -144,23 +148,29 @@ export default {
     let bannerPath = path.resolve("./assets/img/BotBanner.jpg");
     let isGif = false;
 
+    const botRecord = runtimeDb?.getBot?.(sock.user?.id);
     const customBanner =
-      runtimeDb?.getBot?.(sock.user?.id)?.data?.customBanner ??
+      botRecord?.data?.customBanner ??
+      botRecord?.customBanner ??
       runtimeDb?.customBanner ??
       null;
     const customAudio =
-      runtimeDb?.getBot?.(sock.user?.id)?.data?.customAudio ??
+      botRecord?.data?.customAudio ??
+      botRecord?.customAudio ??
       runtimeDb?.customAudio ??
       null;
     const customBannerBuffer = customBanner?.base64
       ? Buffer.from(customBanner.base64, "base64")
       : null;
+    const resolvedCustomPath = customBanner?.path
+      ? path.resolve(customBanner.path)
+      : null;
     if (
-      (customBanner?.path && existsSync(customBanner.path)) ||
+      (resolvedCustomPath && existsSync(resolvedCustomPath)) ||
       customBannerBuffer?.length
     ) {
       bannerPath =
-        customBanner.path ||
+        resolvedCustomPath ||
         `database-banner-${customBanner.base64.slice(0, 32)}`;
       isGif = Boolean(
         customBanner.mimetype?.includes("gif") || bannerPath.endsWith(".gif"),
@@ -181,7 +191,10 @@ export default {
         });
 
         imgBanner = isGif ? prepared.videoMessage : prepared.imageMessage;
-        if (imgBanner) mediaCacheMap.set(bannerPath, imgBanner);
+        if (imgBanner) {
+          if (mediaCacheMap.size >= 10) mediaCacheMap.clear();
+          mediaCacheMap.set(bannerPath, imgBanner);
+        }
       } catch (error) {
         console.error("[menu] Error al preparar media del banner:", error);
       }

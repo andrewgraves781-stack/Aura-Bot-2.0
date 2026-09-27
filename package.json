@@ -5,7 +5,7 @@
   "type": "module",
   "main": "main.ts",
   "scripts": {
-    "start": "tsx main.ts",
+    "start": "NODE_OPTIONS='--expose-gc --max-old-space-size=512' tsx main.ts",
     "prev": "node dist/main.js",
     "test": "tsx --watch main.ts",
     "build": "tsc --noEmit false --outDir dist",
