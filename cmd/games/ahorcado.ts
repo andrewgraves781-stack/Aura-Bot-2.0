@@ -2,15 +2,11 @@ import { createCanvas } from "@napi-rs/canvas";
 import { sendMessageWithRateLimit } from "../../core/mediaSendUtils.ts";
 import { HANGMAN_WORDS } from "../../core/gameData.ts";
 import { addAura } from "../../core/economyConfig.ts";
-
-type HangmanGame = {
-  word: string;
-  guessedLetters: Set<string>;
-  mistakes: number;
-  maxMistakes: number;
-  lastMessageId?: string;
-  timeout?: NodeJS.Timeout;
-};
+import type {
+  HangmanGame,
+  CommandContext,
+  ReplyContext,
+} from "../../types/index.d.ts";
 
 const games = new Map<string, HangmanGame>();
 const GAME_TIMEOUT = 5 * 60 * 1000;
@@ -25,12 +21,18 @@ function clearGame(key: string) {
   games.delete(key);
 }
 
-function scheduleExpiry(ctx: any, key: string, game: HangmanGame) {
+function scheduleExpiry(
+  ctx: CommandContext | ReplyContext,
+  key: string,
+  game: HangmanGame,
+) {
   if (game.timeout) clearTimeout(game.timeout);
   game.timeout = setTimeout(async () => {
     if (games.get(key) !== game) return;
     clearGame(key);
-    await ctx.reply(`⏰ El juego expiró por inactividad. La palabra era: *${game.word.toUpperCase()}*`);
+    await ctx.reply(
+      `⏰ El juego expiró por inactividad. La palabra era: *${game.word.toUpperCase()}*`,
+    );
   }, GAME_TIMEOUT);
 }
 
@@ -102,7 +104,9 @@ function renderGame(game: HangmanGame, happy = false): Buffer {
 
   const displayWord = game.word
     .split("")
-    .map((letter) => (game.guessedLetters.has(letter) ? letter.toUpperCase() : "_"))
+    .map((letter) =>
+      game.guessedLetters.has(letter) ? letter.toUpperCase() : "_",
+    )
     .join(" ");
   context.fillStyle = "#111827";
   context.font = "bold 48px DejaVu Sans";
@@ -111,10 +115,17 @@ function renderGame(game: HangmanGame, happy = false): Buffer {
   return canvas.toBuffer("image/png");
 }
 
-async function sendGame(ctx: any, game: HangmanGame, status: string, ended = false) {
+async function sendGame(
+  ctx: CommandContext,
+  game: HangmanGame,
+  status: string,
+  ended = false,
+) {
   const key = gameKey(ctx.botJid, ctx.from);
   const lives = game.maxMistakes - game.mistakes;
-  const used = [...game.guessedLetters].map((letter) => letter.toUpperCase()).join(", ");
+  const used = [...game.guessedLetters]
+    .map((letter) => letter.toUpperCase())
+    .join(", ");
   const text = [
     "╭〔 🎮 𝐀𝐇𝐎𝐑𝐂𝐀𝐃𝐎 〕⬣",
     `┃ ${status}`,
@@ -122,22 +133,37 @@ async function sendGame(ctx: any, game: HangmanGame, status: string, ended = fal
     used && !ended ? `┃ 🔤 Usadas: ${used}` : "",
     !ended ? "┃ > Escribe una letra o la palabra completa." : "",
     "╰〔 ⚡ 𝐒𝐘𝐒𝐓𝐄𝐌 〕⬣",
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const buttons = ended
     ? []
-    : [{ buttonId: `${ctx.usedPrefix || "."}ahorcado rendirse`, buttonText: { displayText: "🏳️ Rendirse" }, type: 1 }];
+    : [
+        {
+          buttonId: `${ctx.usedPrefix || "."}ahorcado rendirse`,
+          buttonText: { displayText: "🏳️ Rendirse" },
+          type: 1,
+        },
+      ];
   const sentMessage = await sendMessageWithRateLimit(
     ctx.sock,
     ctx.from,
-    { image: renderGame(game, ended && status.includes("Ganaste")), caption: text, buttons, headerType: 4 },
-    { quoted: ctx.msg },
+    {
+      image: renderGame(game, ended && status.includes("Ganaste")),
+      caption: text,
+      buttons,
+      headerType: 4,
+    },
+    {
+      quoted: ctx.msg as unknown as import("@whiskeysockets/baileys").WAMessage,
+    },
   );
   if (!ended) game.lastMessageId = sentMessage?.key?.id;
   if (ended) clearGame(key);
 }
 
-export async function handleReply(ctx: any): Promise<boolean> {
+export async function handleReply(ctx: ReplyContext): Promise<boolean> {
   const key = gameKey(ctx.botJid, ctx.from);
   const game = games.get(key);
   const stanzaId =
@@ -145,7 +171,10 @@ export async function handleReply(ctx: any): Promise<boolean> {
     ctx.msg?.message?.imageMessage?.contextInfo?.stanzaId;
 
   if (!game || !stanzaId || stanzaId !== game.lastMessageId) return false;
-  await defaultCommand.run({ ...ctx, args: [ctx.body.trim()] });
+  await defaultCommand.run({
+    ...ctx,
+    args: [ctx.body.trim()],
+  } as unknown as CommandContext);
   return true;
 }
 
@@ -154,14 +183,16 @@ const defaultCommand = {
   category: "games",
   description: "Juega al ahorcado.",
   handleReply,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const key = gameKey(ctx.botJid, ctx.from);
     const input = ctx.args.join(" ").toLowerCase().trim();
     let game = games.get(key);
 
     if (!game) {
       game = {
-        word: HANGMAN_WORDS[Math.floor(Math.random() * HANGMAN_WORDS.length)].toLowerCase(),
+        word: HANGMAN_WORDS[
+          Math.floor(Math.random() * HANGMAN_WORDS.length)
+        ].toLowerCase(),
         guessedLetters: new Set(),
         mistakes: 0,
         maxMistakes: 6,
@@ -176,13 +207,17 @@ const defaultCommand = {
     if (input === "rendirse" || input === "salir") {
       const word = game.word;
       clearGame(key);
-      return ctx.reply(`🏳️ Te has rendido. La palabra era: *${word.toUpperCase()}*`);
+      return ctx.reply(
+        `🏳️ Te has rendido. La palabra era: *${word.toUpperCase()}*`,
+      );
     }
 
     if (!input) return sendGame(ctx, game, "⚠️ Ya hay un juego en curso.");
     if (input.length === 1) {
-      if (!/^[a-záéíóúüñ]$/u.test(input)) return ctx.reply("⚠️ Escribe una letra válida.");
-      if (game.guessedLetters.has(input)) return ctx.reply("⚠️ Ya intentaste esa letra.");
+      if (!/^[a-záéíóúüñ]$/u.test(input))
+        return ctx.reply("⚠️ Escribe una letra válida.");
+      if (game.guessedLetters.has(input))
+        return ctx.reply("⚠️ Ya intentaste esa letra.");
       game.guessedLetters.add(input);
       if (!game.word.includes(input)) game.mistakes += 1;
     } else if (input === game.word) {
@@ -192,13 +227,25 @@ const defaultCommand = {
     }
 
     scheduleExpiry(ctx, key, game);
-    const won = [...game.word].every((letter) => game.guessedLetters.has(letter));
+    const won = [...game.word].every((letter) =>
+      game.guessedLetters.has(letter),
+    );
     if (won) {
       addAura(ctx.sender, 500);
-      return sendGame(ctx, game, "🎉 ¡Ganaste! Recompensa: +500 Aura Points", true);
+      return sendGame(
+        ctx,
+        game,
+        "🎉 ¡Ganaste! Recompensa: +500 Aura Points",
+        true,
+      );
     }
     if (game.mistakes >= 6) {
-      return sendGame(ctx, game, `💀 ¡Perdiste! La palabra era: ${game.word.toUpperCase()}`, true);
+      return sendGame(
+        ctx,
+        game,
+        `💀 ¡Perdiste! La palabra era: ${game.word.toUpperCase()}`,
+        true,
+      );
     }
     return sendGame(ctx, game, "¡Sigue intentando!");
   },

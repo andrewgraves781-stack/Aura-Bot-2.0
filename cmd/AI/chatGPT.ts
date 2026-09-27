@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import { aiError, askAlya, getPrompt } from "./aiUtils.ts";
 
@@ -6,7 +7,7 @@ export default {
   category: "AI",
   description: "Habla con ChatGPT.",
 
-  async run({ args, reply, react }: any) {
+  async run({ args, reply, react }: CommandContext) {
     const prompt = getPrompt(args);
     if (!prompt) {
       return reply({

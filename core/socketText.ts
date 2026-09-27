@@ -60,18 +60,6 @@ export const fytBold = (texto) => {
     .join("");
 };
 
-export function formatPlainText(text: unknown, footer = "SYSTEM"): string {
-  const value = String(text ?? "").trim();
-  if (!value || /^(?:╭|╰|┏|┌)/u.test(value)) return String(text ?? "");
-
-  const body = value
-    .split("\n")
-    .map((line) => `┃ ${line}`)
-    .join("\n");
-
-  return `╭〔 ⚡ ${fytBold("AURA REED")} 〕⬣\n┃ ${fytBold("ℹ️ INFORMACIÓN")}\n╰━━━━━━━━━━━━⬣\n\n${body}\n\n╰〔 ⚡ ${fytBold(footer)} 〕⬣`;
-}
-
 export const NOT_CMD_FOUND = ({
   cmdName,
   prefix = ".",
@@ -171,11 +159,11 @@ export const NOT_PREMIUM = () => {
 ┃ > por los usuarios premium del bot.`;
 };
 
-export const IS_SUBBOT_ONLINE = ({prefix}: {prefix?: string} ) => {
+export const IS_SUBBOT_ONLINE = ({ prefix }: { prefix?: string }) => {
   return `╭〔  ${fytBold("AURA REED")}〕⬣
 ┃ ✅${fytBold("SUB-BOT EN LÍNEA")}
 ╰━━━━━━━━━━━━⬣
 ┃ > El sub-bot ya está en línea y conectado a WhatsApp.
 ┃ > cuando quieras desvincular escriba \`${prefix}logout\`
 ┃ > para cerrar la sesión del sub-bot.`;
-}
+};

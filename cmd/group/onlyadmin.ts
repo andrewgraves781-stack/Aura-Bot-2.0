@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -6,7 +7,7 @@ export default {
   category: "group",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const value = String(ctx.args?.[0] ?? "").toLowerCase();
     if (!["on", "off", "true", "false", "1", "0"].includes(value)) {
       return ctx.reply({

@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -6,7 +7,7 @@ export default {
   description: "Bloquea o desbloquea un comando del grupo.",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     if (!ctx.isAdmin && !ctx.isMod && !ctx.isOwner)
       return ctx.reply({
         text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ${fytBold("PERMISO DENEGADO")}\n╰━━━━━━━━━━━━⬣\n\n┃ > Solo los administradores pueden restringir comandos.\n\n╰〔 ⚡ ${fytBold("SYSTEM ALERT")} 〕⬣`,

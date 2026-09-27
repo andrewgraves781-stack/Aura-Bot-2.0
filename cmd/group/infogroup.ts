@@ -1,3 +1,5 @@
+import type { GroupMetadata, GroupParticipant } from "@whiskeysockets/baileys";
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -5,14 +7,17 @@ export default {
   category: "group",
   description: "Muestra la información detallada del grupo.",
   groupOnly: true,
-  async run(ctx: any) {
-    const metadata = ctx.groupMeta || {};
+  async run(ctx: CommandContext) {
+    if (!ctx.groupMeta) {
+      return ctx.reply("❌ No se pudo obtener la información del grupo.");
+    }
+    const metadata = ctx.groupMeta;
     const participants = Array.isArray(metadata.participants)
       ? metadata.participants
       : [];
     const admins = participants
-      .filter((participant: any) => participant.admin)
-      .map((participant: any) => participant.id)
+      .filter((participant: GroupParticipant) => Boolean(participant.admin))
+      .map((participant: GroupParticipant) => participant.id)
       .filter(Boolean);
     const description = metadata.desc || "Sin descripción.";
     const date = metadata.creation
@@ -25,7 +30,7 @@ export default {
     text += `┣━━━━〔 🛡️ ${fytBold("ADMINISTRADORES")} 〕━⬣\n\n${admins.map((jid: string) => `┃ ➪ @${jid.split("@")[0]}`).join("\n")}\n\n╰〔 ⚡ ${fytBold("AURA REED")} 〕⬣`;
     return ctx.reply({
       text,
-      mentions: [metadata.owner, ...admins].filter(Boolean),
+      mentions: [metadata.owner, ...admins].filter(Boolean) as string[],
     });
   },
 };

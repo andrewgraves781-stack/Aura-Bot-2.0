@@ -1,6 +1,11 @@
 import { fytBold } from "../../core/socketText.ts";
 import { requestJson, safeFileName } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
+import type {
+  CommandContext,
+  YouTubeVideoData,
+  YouTubeSearchResponse,
+} from "../../types/index.d.ts";
 
 const API = "https://api.lempi.lat";
 const ID =
@@ -10,20 +15,20 @@ export default {
   name: ["dytmp4", "docvideo", "docplayvideo", "docmp4", "dytv", "docplay2"],
   category: "download",
   description: "Descarga videos de YouTube como documento.",
-  async run({ args, reply, react }: any) {
+  async run({ args, reply, react }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query) return reply("⚠️ Proporciona una búsqueda o enlace de video.");
     await react("⏳");
     try {
       let url = query;
       if (!ID.test(query)) {
-        const search = await requestJson(
+        const search = await requestJson<YouTubeSearchResponse>(
           `${DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "")}/search/yt?query=${encodeURIComponent(query)}&key=${DL_CONFIG.alya.API_KEY}`,
         );
         url = search?.result?.[0]?.url || "";
       } else url = `https://youtu.be/${query.match(ID)?.[1]}`;
       if (!url) throw new Error("No se encontró ningún video.");
-      const data = await requestJson(
+      const data = await requestJson<YouTubeVideoData>(
         `${API}/dl/ytv?url=${encodeURIComponent(url)}&quality=1080&apikey=OBOE-AERETHIX`,
         60000,
       );
@@ -38,10 +43,10 @@ export default {
         fileName: `${safeFileName(title, "youtube")}.mp4`,
       });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar el video."}`,
+        text: `❌ Error: ${error instanceof Error ? error.message : "No se pudo descargar el video."}`,
       });
     }
   },

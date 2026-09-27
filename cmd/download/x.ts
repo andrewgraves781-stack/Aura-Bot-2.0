@@ -1,34 +1,46 @@
 import { fytBold } from "../../core/socketText.ts";
 import { downloadToCache, requestJson } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
+import type {
+  CommandContext,
+  TwitterDownloadResponse,
+  TwitterDownloadData,
+  TwitterMediaItem,
+} from "../../types/index.d.ts";
 
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
 const KEY = DL_CONFIG.alya.API_KEY;
 const SOCIAL_URL = /^(?:https?:\/\/)?(?:www\.)?(?:x\.com|twitter\.com)\//i;
 
-function getMediaUrl(value: any): string {
+function getMediaUrl(value: TwitterMediaItem | string | undefined): string {
   if (typeof value === "string") return value;
   return value?.url || "";
 }
 
-function getBestVideo(result: unknown): string {
-  if (!Array.isArray(result)) return getMediaUrl(result);
+function getBestVideo(result: TwitterDownloadData["result"]): string {
+  if (!Array.isArray(result))
+    return getMediaUrl(result as TwitterMediaItem | string | undefined);
 
-  return [...result]
-    .filter((item) => getMediaUrl(item))
-    .sort((left, right) => {
-      const leftQuality = parseInt(String(left?.quality || ""), 10) || 0;
-      const rightQuality = parseInt(String(right?.quality || ""), 10) || 0;
-      return rightQuality - leftQuality;
-    })
-    .map(getMediaUrl)[0] || "";
+  return (
+    [...result]
+      .filter((item) => getMediaUrl(item as TwitterMediaItem | string))
+      .sort((left, right) => {
+        const leftItem = left as TwitterMediaItem;
+        const rightItem = right as TwitterMediaItem;
+        const leftQuality = parseInt(String(leftItem?.quality || ""), 10) || 0;
+        const rightQuality =
+          parseInt(String(rightItem?.quality || ""), 10) || 0;
+        return rightQuality - leftQuality;
+      })
+      .map((item) => getMediaUrl(item as TwitterMediaItem | string))[0] || ""
+  );
 }
 
 export default {
   name: ["x", "twitter", "xdl"],
   category: "download",
   description: "Descarga videos o imágenes de Twitter / X.",
-  async run({ args, reply, react }: any) {
+  async run({ args, reply, react }: CommandContext) {
     const url = args.join(" ").trim();
 
     if (!url || !SOCIAL_URL.test(url)) {
@@ -38,18 +50,27 @@ export default {
     await react("⏳");
 
     try {
-      const response = await requestJson(
+      const response = await requestJson<TwitterDownloadResponse>(
         `${API}/dl/twitter?url=${encodeURIComponent(url)}&key=${KEY}`,
         60000,
       );
       const data = response?.data;
       const type = String(data?.type || "").toLowerCase();
       const result = data?.result;
+      const thumbnail = data?.thumbnail;
       const mediaUrl =
         type === "video"
           ? getBestVideo(result)
-          : getMediaUrl(Array.isArray(result) ? result[0] : result) ||
-            getMediaUrl(data?.thumbnail);
+          : getMediaUrl(
+              Array.isArray(result)
+                ? (result[0] as TwitterMediaItem)
+                : (result as TwitterMediaItem | string | undefined),
+            ) ||
+            getMediaUrl(
+              typeof thumbnail === "string"
+                ? thumbnail
+                : (thumbnail as TwitterMediaItem | undefined),
+            );
 
       if (!response?.status || !mediaUrl) {
         throw new Error("La API no devolvió contenido descargable.");
@@ -71,10 +92,10 @@ export default {
       }
 
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar Twitter/X."}`,
+        text: `❌ Error: ${error instanceof Error ? error.message : "No se pudo descargar Twitter/X."}`,
       });
     }
   },

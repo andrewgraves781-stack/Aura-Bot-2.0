@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { cooldownText } from "../../core/economyConfig.ts";
 import {
   economyTarget,
@@ -11,7 +12,7 @@ export default {
   category: "economy",
   description: "Intenta robarle monedas a otro usuario del grupo.",
   groupOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const target = await economyTarget(ctx);
     if (target === ctx.sender)
       return ctx.reply("🧠 No puedes robarte a ti mismo.");

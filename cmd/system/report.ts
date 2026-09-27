@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import {
   REPORT_GROUP_JID,
@@ -11,7 +12,7 @@ export default {
   name: ["report", "bug", "sugerencia", "reportar", "sugerir"],
   category: "system",
   description: "Envía un bug o sugerencia al grupo de soporte.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const reportText = ctx.args.join(" ").trim();
     if (!reportText) {
       return ctx.reply(
@@ -42,7 +43,9 @@ export default {
         },
       );
       await ctx.react("✅");
-      return ctx.reply(`✅ ${fytBold("REPORTE ENVIADO")}\n\n┃ > ID: ${data.id}`);
+      return ctx.reply(
+        `✅ ${fytBold("REPORTE ENVIADO")}\n\n┃ > ID: ${data.id}`,
+      );
     } catch (error) {
       console.error("[report] No se pudo enviar el reporte:", error);
       await ctx.react("❌");

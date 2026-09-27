@@ -18,26 +18,19 @@ import { db } from "../dbController/db.ts";
 import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import { handleAntilink, handleGroupCall } from "./groupModeration.ts";
 
+import type {
+  ExtendedWASocket,
+  ConnectionOptions,
+  GroupCallEvent,
+} from "../types/index.d.ts";
+export type { ConnectionOptions };
+
 export const logger = pino({ level: "silent" });
 
 const MAX_MAIN_RECONNECT_ATTEMPTS = 2;
 const reconnectTimers = new Map<string, NodeJS.Timeout>();
 const reconnectAttempts = new Map<string, number>();
 const connectionsInProgress = new Set<string>();
-
-export type ConnectionOptions = {
-  pairingMethod?: "qr" | "code";
-  allowPairing?: boolean;
-  pairingPhone?: string;
-  onSocketCreated?: (socket: any) => Promise<void> | void;
-  pairingTimeoutMs?: number;
-  onQr?: (qr: string) => Promise<void> | void;
-  onPairingCode?: (code: string) => Promise<void> | void;
-  onConnected?: () => Promise<void> | void;
-  onPairingError?: (error: Error) => Promise<void> | void;
-  onPairingExpired?: () => Promise<void> | void;
-  onDisconnected?: () => Promise<void> | void;
-};
 
 function resetReconnectAttempts(sessionName: string) {
   reconnectAttempts.delete(sessionName);
@@ -105,15 +98,21 @@ function normalizePairingPhone(value: string): string {
 }
 
 function getBotDisplayName(
-  sock: any,
+  sock: ExtendedWASocket,
   previousName?: string | null,
 ): string | null {
-  const user = sock.user || {};
-  const name = user.name || user.notify || user.pushName || previousName;
+  const user = sock.user as unknown as
+    | {
+        name?: string | null;
+        notify?: string | null;
+        pushName?: string | null;
+      }
+    | undefined;
+  const name = user?.name || user?.notify || user?.pushName || previousName;
   return name ? String(name).trim() : null;
 }
 
-async function getBotGroups(sock: any): Promise<string[]> {
+async function getBotGroups(sock: ExtendedWASocket): Promise<string[]> {
   try {
     const participating = await sock.groupFetchAllParticipating?.();
     return Object.keys(participating || {}).filter((jid) =>
@@ -226,12 +225,13 @@ export async function connectToWhatsApp(
     markOnlineOnConnect: true,
   });
 
-  if (!isSubBot) globalThis.mainSocket = sock;
-  (sock as any).isSubBot = isSubBot;
-  (sock as any).subBotId = sessionName;
-  (sock as any).sessionName = sessionName;
-  await options.onSocketCreated?.(sock);
-  sock.ev.on("creds.update", saveCreds);
+  const extendedSock = sock as ExtendedWASocket;
+  if (!isSubBot) globalThis.mainSocket = extendedSock;
+  extendedSock.isSubBot = isSubBot;
+  extendedSock.subBotId = sessionName;
+  extendedSock.sessionName = sessionName;
+  await options.onSocketCreated?.(extendedSock);
+  extendedSock.ev.on("creds.update", saveCreds);
 
   let connectionOpened = isRegistered;
   let pairingExpired = false;
@@ -249,8 +249,10 @@ export async function connectToWhatsApp(
 
       pairingExpired = true;
       try {
-        (sock.ev as any).removeAllListeners();
-        (sock as any).ws?.close();
+        (
+          extendedSock.ev as unknown as { removeAllListeners: () => void }
+        ).removeAllListeners();
+        extendedSock.ws?.close();
       } catch {
         // La sesión ya puede haberse cerrado al expirar el código.
       }
@@ -335,7 +337,9 @@ export async function connectToWhatsApp(
       clearPairingTimer();
       const mainNum = sock.user?.id ?? "desconocido";
       const botJid = jidNormalizedUser(mainNum);
-      let botId = String((sock.user as any)?.lid || "").trim();
+      let botId = String(
+        (sock.user as unknown as Record<string, unknown>)?.lid || "",
+      ).trim();
       if (!botId) {
         try {
           botId = String(
@@ -349,10 +353,10 @@ export async function connectToWhatsApp(
       botId = normalizeBotId(botId, botJid);
       const botPhoneNumber = cleanPhoneNumber(botJid);
       const botLid = cleanLid(botId);
-      const botGroups = await getBotGroups(sock);
+      const botGroups = await getBotGroups(extendedSock);
       const previousBot = db.getBot(botJid);
-      const botName = getBotDisplayName(sock, previousBot?.bot_name);
-      (sock as any).subBotId = botId;
+      const botName = getBotDisplayName(extendedSock, previousBot?.bot_name);
+      extendedSock.subBotId = botId;
       db.setBot(botJid, {
         bot_id: botId,
         bot_name: botName,
@@ -388,9 +392,11 @@ export async function connectToWhatsApp(
     await options.onDisconnected?.();
     if (pairingExpired) return;
 
-    if ((sock as any).manualLogout) {
+    if (extendedSock.manualLogout) {
       try {
-        (sock.ev as any).removeAllListeners();
+        (
+          extendedSock.ev as unknown as { removeAllListeners: () => void }
+        ).removeAllListeners();
         closeAuthState();
       } catch {
         // La sesión puede haberse cerrado antes de ejecutar la limpieza.
@@ -423,7 +429,9 @@ export async function connectToWhatsApp(
     }
 
     try {
-      (sock.ev as any).removeAllListeners();
+      (
+        sock.ev as unknown as { removeAllListeners: () => void }
+      ).removeAllListeners();
     } catch (error) {
       connectionLog(
         `Error al remover oyentes del socket: ${String(error)}`,
@@ -431,7 +439,9 @@ export async function connectToWhatsApp(
       );
     }
 
-    const error = u.lastDisconnect?.error as any;
+    const error = u.lastDisconnect?.error as
+      | (Error & { output?: { statusCode?: number }; statusCode?: number })
+      | undefined;
     const boomError = error ? new Boom(error) : null;
     const statusCode =
       boomError?.output?.statusCode ??
@@ -630,8 +640,10 @@ export async function connectToWhatsApp(
               ),
             logger: {
               message: () => {},
-              warn: (payload: any) => connectionLog(String(payload), "warn"),
-              error: (payload: any) => connectionLog(String(payload), "error"),
+              warn: (payload: unknown) =>
+                connectionLog(String(payload), "warn"),
+              error: (payload: unknown) =>
+                connectionLog(String(payload), "error"),
               cmdExec: () => {},
             },
           },
@@ -642,10 +654,10 @@ export async function connectToWhatsApp(
     }
   });
 
-  sock.ev.on("call", async (calls: any[]) => {
+  sock.ev.on("call", async (calls: unknown[]) => {
     if (!Array.isArray(calls)) return;
     for (const call of calls) {
-      await handleGroupCall(sock, call, db);
+      await handleGroupCall(sock, call as GroupCallEvent, db);
     }
   });
 
@@ -671,17 +683,19 @@ export async function connectToWhatsApp(
         const setting = action === "add" ? "welcome" : "goodbye";
         if (!group[setting]) return;
 
-        const template =
-          action === "add"
+        const template = String(
+          (action === "add"
             ? group.welcomeMessage ||
               `╭〔 👋 𝐁𝐈𝐄𝐍𝐕𝐄𝐍𝐈𝐃𝐎/𝐀 〕⬣\n┃ ✨ 𝐀 𝐔𝐍 𝐍𝐔𝐄𝐕𝐎 𝐈𝐍𝐓𝐄𝐆𝐑𝐀𝐍𝐓𝐄\n╰━━━━━━━━━━━━⬣\n\n┃ 👋 𝐇𝐨𝐥𝐚 @user\n┃ ✨ 𝐁𝐢𝐞𝐧𝐯𝐞𝐧𝐢𝐝𝐨/𝐚 𝐚:\n┃ 🏰 *@group*\n\n┃ 📜 𝐍𝐨 𝐨𝐥𝐯𝐢𝐝𝐞𝐬 𝐥𝐞𝐞𝐫 𝐥𝐚𝐬 𝐫𝐞𝐠𝐥𝐚𝐬\n┃ 𝐲 𝐝𝐢𝐬𝐟𝐫𝐮𝐭𝐚𝐫 𝐭𝐮 𝐞𝐬𝐭𝐚𝐧𝐜𝐢𝐚.\n\n╰━━〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕━━⬣`
             : group.goodbyeMessage ||
-              `╭〔 😔 𝐒𝐄 𝐍𝐎𝐒 𝐅𝐔𝐄 〕⬣\n┃ ✨ 𝐇𝐀𝐒𝐓𝐀 𝐏𝐑𝐎𝐍𝐓𝐎\n╰━━━━━━━━━━━━⬣\n\n┃ 👋 𝐀𝐝𝐢ó𝐬 @user\n┃ > 𝐄𝐬 𝐮𝐧𝐚 𝐩𝐞𝐧𝐚 𝐪𝐮𝐞 𝐭𝐞 𝐯𝐚𝐲𝐚𝐬 𝐝𝐞:\n┃ > *@group*\n\n┃ > 𝐍𝐮𝐧𝐜𝐚 𝐭𝐞 𝐨𝐥𝐯𝐢𝐝𝐚𝐫𝐞𝐦𝐨𝐬\n\n╰━━〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕━━⬣`;
+              `╭〔 😔 𝐒𝐄 𝐍𝐎𝐒 𝐅𝐔𝐄 〕⬣\n┃ ✨ 𝐇𝐀𝐒𝐓𝐀 𝐏𝐑𝐎𝐍𝐓𝐎\n╰━━━━━━━━━━━━⬣\n\n┃ 👋 𝐀𝐝𝐢ó𝐬 @user\n┃ > 𝐄𝐬 𝐮𝐧𝐚 𝐩𝐞𝐧𝐚 𝐪𝐮𝐞 𝐭𝐞 𝐯𝐚𝐲𝐚𝐬 𝐝𝐞:\n┃ > *@group*\n\n┃ > 𝐍𝐮𝐧𝐜𝐚 𝐭𝐞 𝐨𝐥𝐯𝐢𝐝𝐚𝐫𝐞𝐦𝐨𝐬\n\n╰━━〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕━━⬣`) ||
+            "",
+        );
         const participantJids = participants
-          .map((participant: any) =>
+          .map((participant: string | { id?: string }) =>
             typeof participant === "string" ? participant : participant?.id,
           )
-          .filter(Boolean);
+          .filter((p): p is string => Boolean(p));
         const mentions = participantJids;
         const tags = participantJids
           .map((participant: string) => `@${participant.split("@")[0]}`)

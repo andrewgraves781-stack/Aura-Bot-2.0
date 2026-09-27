@@ -1,3 +1,7 @@
+import type {
+  CommandContext,
+  InteractionApiResponse,
+} from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { request } from "undici";
@@ -6,8 +10,8 @@ export default {
   name: ["creampie", "llenar"],
   description: "Reacción NSFW de creampie.",
   category: "nsfw",
-run: async ({ msg, text, sender, db, reply, react }: any) => {
-  await react("🥛");
+  run: async ({ msg, text, sender, db, reply, react }: CommandContext) => {
+    await react("🥛");
 
     try {
       let targetJid = null;
@@ -43,7 +47,7 @@ run: async ({ msg, text, sender, db, reply, react }: any) => {
       if (response.statusCode !== 200)
         throw new Error(`HTTP ${response.statusCode}`);
 
-      let data: any;
+      let data: InteractionApiResponse;
       try {
         data = JSON.parse(bodyText);
       } catch {
@@ -75,9 +79,11 @@ run: async ({ msg, text, sender, db, reply, react }: any) => {
         gifPlayback: true,
         mimetype: "video/mp4",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
-      await reply({ text: `❌ Error: ${error?.message}` });
+      await reply({
+        text: `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
+      });
     }
   },
 };

@@ -1,3 +1,4 @@
+import type { CommandContext, TopMsgUser } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 function getMessageWeek(date = new Date()): string {
@@ -19,7 +20,7 @@ export default {
   description: "Muestra quién ha enviado más mensajes en el grupo.",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const pageSize = 10;
     const requestedPage = Number.parseInt(String(ctx.args?.[0] || "1"), 10);
     if (!Number.isInteger(requestedPage) || requestedPage < 1)
@@ -28,20 +29,30 @@ export default {
       });
     const currentWeek = getMessageWeek();
     const users = (
-      Array.isArray(ctx.db.getGroup(ctx.from).topMsgUsers)
-        ? ctx.db.getGroup(ctx.from).topMsgUsers
-        : []
+      ((ctx.db.getGroup(ctx.from).topMsgUsers as
+        TopMsgUser[] | string | undefined) instanceof Array
+        ? (ctx.db.getGroup(ctx.from).topMsgUsers as TopMsgUser[])
+        : []) as TopMsgUser[]
     )
-      .map((user: any) => ({
+      .map((user: TopMsgUser) => ({
         id: user.jid,
         lid: user.lid,
         pushName: user.pushName || "Usuario",
         week: user.week,
         count: Number(user.count || 0),
       }))
-      .filter((user: any) => user.week === currentWeek)
-      .filter((user: any) => user.id && user.count > 0)
-      .sort((left: any, right: any) => right.count - left.count);
+      .filter(
+        (user: { id: string; week: string; count: number }) =>
+          user.week === currentWeek,
+      )
+      .filter(
+        (user: { id: string; week: string; count: number }) =>
+          user.id && user.count > 0,
+      )
+      .sort(
+        (left: { count: number }, right: { count: number }) =>
+          right.count - left.count,
+      );
     if (!users.length)
       return ctx.reply({
         text: `╭〔 ⚠️ ${fytBold("AURA REED")} 〕⬣\n┃ ${fytBold("SIN MENSAJES REGISTRADOS")}\n╰━━━━━━━━━━━━⬣\n\n┃ > Todavía no hay actividad para mostrar.\n\n╰〔 ⚡ ${fytBold("SYSTEM INFO")} 〕⬣`,
@@ -56,11 +67,16 @@ export default {
       requestedPage * pageSize,
     );
     let text = `╭〔 💬 ${fytBold("MENSAJES TOP")} 💬 〕⬣\n┃ 🏆 ${fytBold("RANKING DE MENSAJES")}\n┃ 📄 Página ${requestedPage}/${totalPages}\n╰━━━━━━━━━━━━⬣\n\n`;
-    page.forEach((user: any, index: number) => {
-      const position = (requestedPage - 1) * pageSize + index;
-      const medal = position < 3 ? ["🥇", "🥈", "🥉"][position] : "🎖️";
-      text += `┃ ${medal} ${user.pushName}\n┃ 💬 ${user.count} mensajes\n\n`;
-    });
+    page.forEach(
+      (
+        user: { id: string; pushName: string; count: number },
+        index: number,
+      ) => {
+        const position = (requestedPage - 1) * pageSize + index;
+        const medal = position < 3 ? ["🥇", "🥈", "🥉"][position] : "🎖️";
+        text += `┃ ${medal} ${user.pushName}\n┃ 💬 ${user.count} mensajes\n\n`;
+      },
+    );
     text += `╰〔 ⚡ ${fytBold("AURA GROUP")} ⚡ 〕⬣`;
     return ctx.reply({ text });
   },

@@ -1,3 +1,8 @@
+import type {
+  CommandContext,
+  FacebookDownloadResponse,
+  FacebookMediaItem,
+} from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import { downloadToCache, requestJson } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
@@ -8,13 +13,13 @@ export default {
   name: ["fb", "facebook", "fbdl", "facebookdl", "fbvideo", "fbv", "fbreels"],
   category: "download",
   description: "Descarga videos de Facebook y Reels.",
-  async run({ args, reply, react }: any) {
+  async run({ args, reply, react }: CommandContext) {
     const url = args.join(" ").trim();
     if (!url)
       return reply("⚠️ Proporciona un enlace de Facebook o Facebook Reels.");
     await react("⏳");
     try {
-      const data = await requestJson(
+      const data = await requestJson<FacebookDownloadResponse>(
         `${API}/dl/facebook?url=${encodeURIComponent(url)}&key=${DL_CONFIG.alya.API_KEY}`,
         60000,
       );
@@ -25,20 +30,32 @@ export default {
           : Array.isArray(data?.result)
             ? data.result
             : [data?.data || data?.result];
-      const item = items
-        .filter((entry: any) => entry)
-        .sort((left: any, right: any) => {
-          const leftQuality = parseInt(String(left?.quality || ""), 10) || 0;
-          const rightQuality = parseInt(String(right?.quality || ""), 10) || 0;
+      const item = (items as (string | FacebookMediaItem)[])
+        .filter((entry): entry is string | FacebookMediaItem => Boolean(entry))
+        .sort((left, right) => {
+          const leftQuality =
+            typeof left === "object"
+              ? parseInt(String(left?.quality || ""), 10) || 0
+              : 0;
+          const rightQuality =
+            typeof right === "object"
+              ? parseInt(String(right?.quality || ""), 10) || 0
+              : 0;
           return rightQuality - leftQuality;
         })[0];
       const videoUrl =
         typeof item === "string" ? item : item?.url || item?.hd || item?.sd;
       if (!data?.status || !videoUrl)
         throw new Error("La API no devolvió un video descargable.");
-      const quality = item?.quality || "HD";
+      const quality = (typeof item === "object" ? item?.quality : null) || "HD";
       const caption = `╭〔 🎥 ${fytBold("FACEBOOK VIDEO")} 〕━⬣\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Calidad")} › ${quality}\n┃ > ${fytBold("Tipo")} › Video MP4\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
-      const file = await downloadToCache(videoUrl, 180000);
+      const file = await downloadToCache(videoUrl, 180000, {
+        Accept: "video/*,*/*;q=0.8",
+        Origin: "https://www.facebook.com",
+        Referer: "https://www.facebook.com/",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      });
       await reply({
         video: { url: file },
         mimetype: "video/mp4",
@@ -46,10 +63,10 @@ export default {
         caption,
       });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar el video."}`,
+        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo descargar el video."}`,
       });
     }
   },

@@ -1,28 +1,11 @@
 import { db } from "../dbController/db.ts";
+import type { EconomyUser, CooldownRows } from "../types/index.d.ts";
 
-export type EconomyUser = Record<string, any>;
+export type { EconomyUser, CooldownRows };
 
 const DEFAULT_ECONOMY_USER: EconomyUser = {
   bolsillo: 0,
   banco: 0,
-};
-
-type CooldownRows = {
-  daily: number;
-  weekly: number;
-  fortnightly: number;
-  monthly: number;
-  steal: number;
-  work: number;
-  cf: number;
-  roulete: number;
-  mine: number;
-  hunt: number;
-  ppt: number;
-  slut: number;
-  crime: number;
-  adventure: number;
-  aura: number;
 };
 
 const COOLDOWNS: CooldownRows = {
@@ -104,8 +87,15 @@ export function getBolsillo(groupJid: string, userJid: string): number {
 }
 
 export function addAura(jid: string, amount: number) {
-  const user: Record<string, any> = db.getUser(jid) ?? {};
-  const aura = Math.max(0, Number(user.aura ?? 0) + amount);
+  const user = db.getUser(jid);
+  const aura = Math.max(
+    0,
+    Number(
+      (user.data as Record<string, unknown> | undefined)?.aura ??
+        (user as Record<string, unknown>).aura ??
+        0,
+    ) + amount,
+  );
   db.setUser(jid, { aura, auraXp: aura, level: getAuraLevel(aura) });
   return aura;
 }
@@ -131,17 +121,17 @@ export function transferBolsillo(
 }
 
 function getEconomyStore(groupJid: string): Record<string, EconomyUser> {
-  const group = db.getGroup(groupJid) as Record<string, any>;
-  if (!group.economy || typeof group.economy !== "object") group.economy = {};
-  if (!group.economy.users || typeof group.economy.users !== "object")
-    group.economy.users = {};
-  return group.economy.users;
+  const group = db.getGroup(groupJid);
+  const groupData = (group.data || {}) as Record<string, unknown>;
+  const economy = (groupData.economy || {}) as Record<string, unknown>;
+  const users = (economy.users || {}) as Record<string, EconomyUser>;
+  return users;
 }
 
 export function getEconomyUser(
   groupJid: string,
   userJid: string,
-  defaults: EconomyUser = {},
+  defaults: Partial<EconomyUser> = {},
 ): EconomyUser {
   const users = getEconomyStore(groupJid);
   return { ...DEFAULT_ECONOMY_USER, ...defaults, ...(users[userJid] ?? {}) };
@@ -150,14 +140,16 @@ export function getEconomyUser(
 export function setEconomyUser(
   groupJid: string,
   userJid: string,
-  data: EconomyUser,
+  data: Partial<EconomyUser>,
 ): EconomyUser {
-  const group = db.getGroup(groupJid) as Record<string, any>;
+  const group = db.getGroup(groupJid);
+  const groupData = (group.data || {}) as Record<string, unknown>;
+  const economy = (groupData.economy || {}) as Record<string, unknown>;
   const users = getEconomyStore(groupJid);
   users[userJid] = { ...getEconomyUser(groupJid, userJid), ...data };
   db.setGroup(groupJid, {
     ...group,
-    economy: { ...(group.economy ?? {}), users },
+    economy: { ...economy, users },
   });
   return users[userJid];
 }

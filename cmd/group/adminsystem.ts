@@ -1,3 +1,5 @@
+import type { GroupMetadata, GroupParticipant } from "@whiskeysockets/baileys";
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 const status = (value: unknown): string =>
@@ -26,12 +28,17 @@ export default {
   description: "Muestra las configuraciones actuales del grupo.",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
-    const metadata = ctx.groupMeta || {};
+  async run(ctx: CommandContext) {
+    if (!ctx.groupMeta) {
+      return ctx.reply("❌ No se pudo obtener la información del grupo.");
+    }
+    const metadata = ctx.groupMeta;
     const participants = Array.isArray(metadata.participants)
       ? metadata.participants
       : [];
-    const admins = participants.filter((participant: any) => participant.admin);
+    const admins = participants.filter((participant: GroupParticipant) =>
+      Boolean(participant.admin),
+    );
     const group = ctx.db.getGroup(ctx.from);
 
     let text = `╭〔 ⚙️ ${fytBold("ADMIN SYSTEM")} 〕⬣\n`;

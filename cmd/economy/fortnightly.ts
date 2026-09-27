@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   cooldownText,
   formatCoins,
@@ -10,7 +11,7 @@ export default {
   name: ["fortnightly", "quincenal", "quinsenal", "quincena"],
   category: "economy",
   description: "Reclama tu recompensa quincenal.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const user = getEconomyUser(ctx.from, ctx.sender, {
       lastFortnightly: 0,
       fortnightlyStreak: 0,

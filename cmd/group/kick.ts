@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -7,7 +8,7 @@ export default {
   groupOnly: true,
   adminOnly: true,
   botAdmin: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const context = ctx.msg?.message?.extendedTextMessage?.contextInfo;
     const targets = context?.mentionedJid?.length
       ? context.mentionedJid

@@ -1,3 +1,9 @@
+import type {
+  CommandContext,
+  SoundCloudTrack,
+  SoundCloudTranscoding,
+  SoundCloudSearchResponse,
+} from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import { safeFileName } from "../../core/downloadUtils.ts";
 import { request } from "undici";
@@ -16,14 +22,14 @@ async function text(url: string): Promise<string> {
   return response.body.text();
 }
 
-async function json(url: string): Promise<any> {
+async function json<T = unknown>(url: string): Promise<T> {
   const response = await request(url, {
     headers: { "User-Agent": "Mozilla/5.0" },
     signal: AbortSignal.timeout(30000),
   });
   if (response.statusCode < 200 || response.statusCode >= 300)
     throw new Error(`HTTP ${response.statusCode}`);
-  return response.body.json();
+  return (await response.body.json()) as T;
 }
 
 async function clientId(): Promise<string> {
@@ -50,7 +56,7 @@ export default {
   name: ["dscplay", "dscdl", "dsc", "docsoundcloud"],
   category: "download",
   description: "Descarga SoundCloud como documento MP3.",
-  async run({ args, reply, react, sock, from, msg, sender }: any) {
+  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query)
       return reply("⚠️ Proporciona una búsqueda o enlace de SoundCloud.");
@@ -59,23 +65,25 @@ export default {
       const id = await clientId();
       let url = query;
       if (!query.includes("soundcloud.com/")) {
-        const search = await json(
+        const search = await json<SoundCloudSearchResponse>(
           `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(query)}&client_id=${id}&limit=1`,
         );
         url = search.collection?.[0]?.permalink_url || "";
       }
       if (!url) throw new Error("No se encontró ningún track.");
-      const track = await json(
+      const track = await json<SoundCloudTrack>(
         `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(url)}&client_id=${id}`,
       );
       const transcoding = track.media?.transcodings?.find(
-        (item: any) =>
+        (item: SoundCloudTranscoding) =>
           item.format?.mime_type === "audio/mpeg" &&
           item.format?.protocol === "progressive",
       );
       if (!transcoding)
         throw new Error("Este track no tiene un stream MP3 descargable.");
-      const stream = await json(`${transcoding.url}?client_id=${id}`);
+      const stream = await json<{ url?: string }>(
+        `${transcoding.url}?client_id=${id}`,
+      );
       if (!stream?.url) throw new Error("SoundCloud no devolvió el audio.");
       const title = track.title || "SoundCloud";
       const caption = `╭〔 🎵 ${fytBold("SOUNDCLOUD DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${track.user?.username || "N/A"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
@@ -100,10 +108,10 @@ export default {
         fileName: `${safeFileName(title, "soundcloud")}.mp3`,
       });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar SoundCloud."}`,
+        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo descargar SoundCloud."}`,
       });
     }
   },

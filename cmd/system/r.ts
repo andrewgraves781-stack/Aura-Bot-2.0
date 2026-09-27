@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { fytBold } from "../../core/socketText.ts";
@@ -18,7 +19,7 @@ export default {
   description: "Ejecuta comandos en la terminal del servidor.",
   ownerOnly: true,
 
-  async run({ args, usedPrefix, reply, react }: any) {
+  async run({ args, usedPrefix, reply, react }: CommandContext) {
     const command = args.join(" ").trim();
     if (!command) {
       return reply({
@@ -43,12 +44,15 @@ export default {
       return reply({
         text: `╭〔 🖥️ ${fytBold("TERMINAL EXEC")} 〕━⬣\n\n\`\`\`\n${output}\n\`\`\`\n\n╰━━〔 ⚡ ${fytBold("SYSTEM")} 〕━━⬣`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const output =
         [
-          limitOutput(error?.stdout),
-          limitOutput(error?.stderr && `[STDERR]\n${error.stderr}`),
-          error?.message && `[ERROR CRÍTICO]\n${error.message}`,
+          limitOutput((error as { stdout?: string }).stdout),
+          limitOutput(
+            (error as { stderr?: string }).stderr &&
+              `[STDERR]\n${(error as { stderr?: string }).stderr}`,
+          ),
+          error instanceof Error ? error.stack || error.message : String(error),
         ]
           .filter(Boolean)
           .join("\n") || "Error desconocido.";

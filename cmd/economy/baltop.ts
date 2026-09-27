@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { getGroupEconomyUsers, formatCoins } from "../../core/economyConfig.ts";
 import { db } from "../../dbController/db.ts";
 
@@ -6,7 +7,7 @@ export default {
   category: "economy",
   description: "Muestra quién tiene más monedas en el grupo.",
   groupOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const pageSize = 10;
     const requestedPage = Number.parseInt(String(ctx.args?.[0] || "1"), 10);
     if (!Number.isInteger(requestedPage) || requestedPage < 1) {
@@ -25,7 +26,10 @@ export default {
       const jid = String(user.jid || "").trim();
       const storedUser = {
         jid,
-        username: user.username || (user as any).pushName || "Usuario",
+        username:
+          user.username ||
+          (user as { pushName?: string }).pushName ||
+          "Usuario",
       };
       if (jid) usersByIdentity.set(jid.split("@")[0].split(":")[0], storedUser);
       if (user.lid)
@@ -40,16 +44,21 @@ export default {
         );
     }
     const rows = Object.entries(getGroupEconomyUsers(ctx.from))
-      .map(([jid, user]: [string, any]) => {
-        const number = jid.split("@")[0].split(":")[0];
-        const storedUser = usersByIdentity.get(number);
-        return {
-          jid: storedUser?.jid || "",
-          username: storedUser?.username || "Usuario",
-          number,
-          total: Number(user.bolsillo ?? 0) + Number(user.banco ?? 0),
-        };
-      })
+      .map(
+        ([jid, user]: [
+          string,
+          Partial<import("../../types/index.d.ts").EconomyUser>,
+        ]) => {
+          const number = jid.split("@")[0].split(":")[0];
+          const storedUser = usersByIdentity.get(number);
+          return {
+            jid: storedUser?.jid || "",
+            username: storedUser?.username || "Usuario",
+            number,
+            total: Number(user.bolsillo ?? 0) + Number(user.banco ?? 0),
+          };
+        },
+      )
       .filter((row) => row.jid)
       .filter((row) => row.number !== botNumber && row.number !== botId)
       .filter((row) => row.total > 0)

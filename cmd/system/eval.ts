@@ -1,8 +1,9 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { inspect } from "node:util";
 
 const AsyncFunction = Object.getPrototypeOf(async function () {})
   .constructor as {
-  new (...args: string[]): (...values: any[]) => Promise<any>;
+  new (...args: string[]): (...values: unknown[]) => Promise<unknown>;
 };
 
 function formatResult(value: unknown): string {
@@ -15,10 +16,10 @@ function formatResult(value: unknown): string {
   });
 }
 
-function getMessageContext(message: any) {
+function getMessageContext(message: Record<string, unknown>) {
   const contextInfo = Object.values(message?.message ?? {})
-    .map((value: any) => value?.contextInfo)
-    .find(Boolean) as any;
+    .map((value) => (value as Record<string, unknown>)?.contextInfo)
+    .find(Boolean) as Record<string, unknown> | undefined;
   const quotedMessage = contextInfo?.quotedMessage ?? null;
 
   return {
@@ -40,7 +41,7 @@ export default {
   description: "Evalúa código con todo el contexto del handler.",
   category: "system",
   ownerOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const code = String(ctx.text || ctx.args?.join(" ") || "").trim();
     if (!code)
       return ctx.reply(
@@ -68,7 +69,7 @@ export default {
         isOwner: ctx.isOwner,
         isMod: ctx.isMod,
         isPremium: ctx.isPremium,
-        isSelf: ctx.isSelf,
+        isSelf: false, // isSelf not in CommandContext
       },
     };
     const names = Object.keys(context);
@@ -90,9 +91,9 @@ export default {
 
       const output = formatResult(result);
       return ctx.reply(`✅ Resultado:\n${output.slice(0, 6000)}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       return ctx.reply(
-        `❌ ${String(error?.stack || error?.message || error).slice(0, 6000)}`,
+        `❌ ${(error instanceof Error ? error.stack || error.message : String(error)).slice(0, 6000)}`,
       );
     }
   },

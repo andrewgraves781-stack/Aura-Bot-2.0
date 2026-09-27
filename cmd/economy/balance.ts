@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   economyTarget,
   economyUser,
@@ -8,7 +9,7 @@ export default {
   name: ["bank", "bal", "balance", "coins"],
   category: "economy",
   description: "Muestra tu saldo actual o el de otro usuario.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const target = await economyTarget(ctx);
     const user = economyUser(ctx, target);
     const total = Number(user.bolsillo) + Number(user.banco);

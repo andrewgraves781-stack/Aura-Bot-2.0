@@ -1,4 +1,13 @@
+import type { CommandContext } from "../../types/index.d.ts";
+import type { DatabaseBot } from "../../types/database.d.ts";
 import { fytBold } from "../../core/socketText.ts";
+
+type BotParticipant = {
+  id?: string;
+  lid?: string;
+  jid?: string;
+  phoneNumber?: string;
+};
 
 function normalizeNumber(value: unknown): string {
   return String(value || "")
@@ -23,7 +32,7 @@ function isPhoneJid(value: unknown): boolean {
   return /^\d+@s\.whatsapp\.net$/.test(cleanJid(value));
 }
 
-function getBotNumber(bot: any, fallback?: string): string {
+function getBotNumber(bot: DatabaseBot, fallback?: string): string {
   const jid = [
     bot.jid,
     bot.phone_number,
@@ -44,15 +53,15 @@ function matchesIdentity(value: unknown, identities: unknown[]): boolean {
 }
 
 async function resolveBotJid(
-  bot: any,
-  participants: any[],
+  bot: DatabaseBot,
+  participants: BotParticipant[],
   resolveLid?: (jid: string) => Promise<string>,
 ): Promise<string> {
   const identities = [bot.bot_id, bot.lid, bot.jid, bot.phone_number].filter(
     Boolean,
   );
   const participant = participants.find(
-    (entry: any) =>
+    (entry: BotParticipant) =>
       matchesIdentity(entry?.id, identities) ||
       matchesIdentity(entry?.lid, identities) ||
       matchesIdentity(entry?.jid, identities) ||
@@ -82,7 +91,7 @@ async function resolveBotJid(
   return "";
 }
 
-function getBotType(bot: any): string {
+function getBotType(bot: DatabaseBot): string {
   return Number(bot.isMain) === 1 ? "Main-Bot" : "SuB-Bot";
 }
 
@@ -92,20 +101,29 @@ export default {
   description: "Muestra los bots activos y su tipo.",
   ownerOnly: false,
 
-  async run({ from, db, groupMeta, resolveLid, usedPrefix, reply }: any) {
+  async run({
+    from,
+    db,
+    groupMeta,
+    resolveLid,
+    usedPrefix,
+    reply,
+  }: CommandContext) {
     const bots = (db.getAllBots?.() || []).filter(
-      (bot: any) =>
+      (bot: DatabaseBot) =>
         String(bot.status || "offline").toLowerCase() === "active" &&
         (getBotNumber(bot) || bot.bot_id || bot.lid),
     );
     const isGroup = String(from || "").endsWith("@g.us");
     const currentGroup = normalizeGroup(from);
-    const participants = isGroup ? groupMeta?.participants || [] : [];
+    const participants: BotParticipant[] = isGroup
+      ? groupMeta?.participants || []
+      : [];
     const mentions: string[] = [];
 
     let visibleBots = bots;
     if (isGroup) {
-      visibleBots = bots.filter((bot: any) =>
+      visibleBots = bots.filter((bot: DatabaseBot) =>
         (Array.isArray(bot.groups) ? bot.groups : []).some(
           (group: string) => normalizeGroup(group) === currentGroup,
         ),

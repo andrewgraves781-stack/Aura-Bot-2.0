@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -6,7 +7,7 @@ export default {
   category: "group",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     if (["delprefix", "deleteprefix"].includes(ctx.cmdName)) {
       ctx.db.setGroup(ctx.from, { prefix: null });
       return ctx.reply({

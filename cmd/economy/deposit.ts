@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   amountArg,
   economyUser,
@@ -9,7 +10,7 @@ export default {
   name: ["deposit", "d", "dep"],
   category: "economy",
   description: "Deposita monedas en el banco.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const user = economyUser(ctx);
     const raw = String(ctx.args?.[0] ?? "").toLowerCase();
     const amount =

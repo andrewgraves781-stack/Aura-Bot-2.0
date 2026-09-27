@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 const ON = ["on", "activar", "enable", "1", "true"];
@@ -9,7 +10,7 @@ export default {
   description: "Enciende o apaga el bot en el grupo actual.",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const value = String(ctx.args?.[0] || "").toLowerCase();
     const group = ctx.db.getGroup(ctx.from);
     if (!value) {

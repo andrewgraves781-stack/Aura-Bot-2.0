@@ -1,6 +1,7 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
-function getCategories(ctx: any): string[] {
+function getCategories(ctx: CommandContext): string[] {
   return [
     ...new Set<string>(
       (ctx.getPluginCategories?.() ?? []).map((category: string) =>
@@ -16,7 +17,7 @@ export default {
   description: "Activa o desactiva un catálogo de comandos para este grupo.",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const action = String(ctx.cmdName || "").toLowerCase();
     const target = String(ctx.args?.[0] ?? "")
       .trim()

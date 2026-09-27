@@ -2,6 +2,7 @@ import { fytBold } from "../../core/socketText.ts";
 import { requestJson, safeFileName } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { sendDownloadPreview } from "../../core/downloadPreview.ts";
+import type { CommandContext, SpotifyResponse } from "../../types/index.d.ts";
 
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
 const KEY = DL_CONFIG.alya.API_KEY;
@@ -10,7 +11,7 @@ export default {
   name: ["spotify", "splay", "sp", "spdl"],
   category: "download",
   description: "Descarga canciones de Spotify por enlace o búsqueda.",
-  async run({ args, reply, react, sock, from, msg, sender }: any) {
+  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query)
       return reply(
@@ -23,7 +24,7 @@ export default {
       const parameter = isUrl
         ? `url=${encodeURIComponent(query.split("?")[0])}`
         : `query=${encodeURIComponent(query)}`;
-      const response = await requestJson(
+      const response = await requestJson<SpotifyResponse>(
         `${API}${endpoint}?${parameter}&key=${KEY}`,
       );
       const song = response?.data;
@@ -34,7 +35,9 @@ export default {
       const title = song.title || "Canción de Spotify";
       const originalUrl =
         song.url ||
-        (isUrl ? query.split("?")[0] : `https://open.spotify.com/search/${encodeURIComponent(title)}`);
+        (isUrl
+          ? query.split("?")[0]
+          : `https://open.spotify.com/search/${encodeURIComponent(title)}`);
       let caption = `╭〔 🎵 ${fytBold("SPOTIFY PLAY")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${song.artist || "Desconocido"}\n┃ > ${fytBold("Álbum")} › ${song.album || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${song.duration || "N/A"}\n┃ > ${fytBold("Tipo")} › Audio (MP3)\n┃ > ${fytBold("URL")} › ${originalUrl}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando audio...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const cover = song.coverHd || song.cover;
       const hasPreview = cover
@@ -57,10 +60,14 @@ export default {
         fileName: `${safeFileName(title, "spotify")}.mp3`,
       });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo descargar la canción.";
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar la canción."}`,
+        text: `❌ Error: ${message}`,
       });
     }
   },

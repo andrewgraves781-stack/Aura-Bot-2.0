@@ -1,17 +1,26 @@
 import { readFileSync } from "node:fs";
 import { fytBold } from "./socketText.ts";
 import { getActiveSubBots } from "./subbotManager.ts";
+import type { proto } from "@whiskeysockets/baileys";
+import type {
+  ExtendedWASocket,
+  IDatabase,
+  DatabaseGroup,
+  GroupWarnEntry,
+  GroupCallEvent,
+} from "../types/index.d.ts";
+import type { BadWordLevel } from "../types/media.d.ts";
 
 const badWordsData = JSON.parse(
   readFileSync(new URL("../database/badWords.json", import.meta.url), "utf8"),
 );
 
-function getWarnings(group: any): Record<string, any[]> {
+function getWarnings(group: DatabaseGroup): Record<string, GroupWarnEntry[]> {
   return group.warns && typeof group.warns === "object" ? group.warns : {};
 }
 
 function addWarning(
-  db: any,
+  db: IDatabase,
   groupJid: string,
   userJid: string,
   reason: string,
@@ -30,10 +39,15 @@ function addWarning(
 }
 
 function cleanJid(value: unknown): string {
-  return String(value || "").trim().replace(/:\d+(?=@)/, "");
+  return String(value || "")
+    .trim()
+    .replace(/:\d+(?=@)/, "");
 }
 
-async function getAdminSocket(current: any, groupJid: string): Promise<any> {
+async function getAdminSocket(
+  current: ExtendedWASocket,
+  groupJid: string,
+): Promise<ExtendedWASocket | null> {
   const sockets = [current, globalThis.mainSocket, ...getActiveSubBots()];
   const candidates = sockets.filter(
     (socket, index) =>
@@ -46,7 +60,9 @@ async function getAdminSocket(current: any, groupJid: string): Promise<any> {
       const identities = [socket.user?.id, socket.user?.lid, socket.subBotId]
         .map(cleanJid)
         .filter(Boolean);
-      const phoneJid = identities.find((jid) => jid.endsWith("@s.whatsapp.net"));
+      const phoneJid = identities.find((jid) =>
+        jid.endsWith("@s.whatsapp.net"),
+      );
       if (phoneJid) {
         const lid = await socket.signalRepository?.lidMapping
           ?.getLIDForPN(phoneJid)
@@ -54,11 +70,12 @@ async function getAdminSocket(current: any, groupJid: string): Promise<any> {
         if (lid) identities.push(cleanJid(lid));
       }
 
-      const participant = metadata?.participants?.find((entry: any) =>
-        [entry?.id, entry?.lid, entry?.jid, entry?.phoneNumber]
+      const participant = metadata?.participants?.find((entry) => {
+        const e = entry as unknown as Record<string, unknown>;
+        return [e?.id, e?.lid, e?.jid, e?.phoneNumber]
           .map(cleanJid)
-          .some((jid: string) => jid && identities.includes(jid)),
-      );
+          .some((jid: string) => jid && identities.includes(jid));
+      });
       if (participant?.admin === "admin" || participant?.admin === "superadmin")
         return socket;
     } catch {
@@ -75,8 +92,8 @@ const prohibitedLinkRegex =
   /(?:https?:\/\/)?(?:www\.)?(?:chat\.whatsapp\.com\/[\w-]+|whatsapp\.com\/channel\/[\w-]+)/i;
 
 export async function handleAntilink(
-  sock: any,
-  message: any,
+  sock: ExtendedWASocket,
+  message: proto.IWebMessageInfo,
   text: string,
   isAdmin: boolean,
   isOwner: boolean,
@@ -93,9 +110,7 @@ export async function handleAntilink(
     return false;
   if (!prohibitedLinkRegex.test(text)) return false;
 
-  const actionSock = isBotAdmin
-    ? sock
-    : await getAdminSocket(sock, groupJid);
+  const actionSock = isBotAdmin ? sock : await getAdminSocket(sock, groupJid);
   if (!actionSock) return false;
 
   const userJid = message.key?.participant || message.participant;
@@ -103,11 +118,14 @@ export async function handleAntilink(
 
   try {
     await actionSock.sendMessage(groupJid, { delete: message.key });
-    await actionSock.sendMessage(groupJid, {
-      text: `> 🚫 *Anti-Link Activado*\n\nSe ha eliminado el mensaje de *${message.pushName || "Usuario"}* y será expulsado por enviar un enlace de grupo o canal.\n\n⚠️ Los enlaces de grupos y canales no están permitidos.`,
-      quoted: message,
-      mentions: [userJid],
-    });
+    await actionSock.sendMessage(
+      groupJid,
+      {
+        text: `> 🚫 *Anti-Link Activado*\n\nSe ha eliminado el mensaje de *${message.pushName || "Usuario"}* y será expulsado por enviar un enlace de grupo o canal.\n\n⚠️ Los enlaces de grupos y canales no están permitidos.`,
+        mentions: [userJid],
+      },
+      { quoted: message as proto.IWebMessageInfo & { key: proto.IMessageKey } },
+    );
     await actionSock.groupParticipantsUpdate(groupJid, [userJid], "remove");
     console.log(`[ANTILINK] Mensaje eliminado y usuario ${userJid} expulsado.`);
     return true;
@@ -127,7 +145,7 @@ function normalizeText(value: string): string {
 }
 
 const toxicWords: ToxicMatch[] = Object.values(badWordsData.levels)
-  .flatMap((level: any) =>
+  .flatMap((level: BadWordLevel) =>
     level.words.map((word: string) => ({
       word: normalizeText(word),
       reason: level.reason,
@@ -142,30 +160,23 @@ function findToxicMatch(text: string): ToxicMatch | null {
 }
 
 export async function handleGroupToxic(
-  sock: any,
-  message: any,
+  sock: ExtendedWASocket,
+  message: proto.IWebMessageInfo,
   text: string,
-  db: any,
+  db: IDatabase,
   isAdmin: boolean,
   isBotAdmin: boolean,
 ): Promise<boolean> {
   const groupJid = message?.key?.remoteJid;
   const userJid = message?.key?.participant;
-  if (
-    !groupJid?.endsWith("@g.us") ||
-    !userJid ||
-    message.key.fromMe ||
-    isAdmin
-  )
+  if (!groupJid?.endsWith("@g.us") || !userJid || message.key.fromMe || isAdmin)
     return false;
   const group = db.getGroup(groupJid);
   if (!group.antiToxic || !text || text.startsWith(".")) return false;
   const toxicMatch = findToxicMatch(text);
   if (!toxicMatch) return false;
 
-  const actionSock = isBotAdmin
-    ? sock
-    : await getAdminSocket(sock, groupJid);
+  const actionSock = isBotAdmin ? sock : await getAdminSocket(sock, groupJid);
   if (!actionSock) return false;
 
   try {
@@ -177,10 +188,15 @@ export async function handleGroupToxic(
       `Toxicidad: ${toxicMatch.reason}`,
     );
     await actionSock.sendMessage(groupJid, {
-      text: `╭〔 ⚠️ ${fytBold("AURA REED")} 〕⬣\n┃ 🚫 ${fytBold("ANTI-TOXIC SYSTEM")}\n╰━━━━━━━━━━━━⬣\n\n┃ 👤 Usuario: @${userJid.split("@")[0]}\n┃ 📊 Warns: [ ${count}/${group.warnLimit || 3} ]\n┃ 🛡️ Admin: ${fytBold("SYSTEM")} ⚡\n┃ 📌 Acción: Llamada de atención\n┃ 📝 Razón: ${toxicMatch.reason}\n┃ ⏰ Fecha: ${new Date().toLocaleDateString("es-CR", { timeZone: "America/Costa_Rica" })}\n\n┣━━━━━━━━━━━━━━━━⬣\n\n┃ ⚠️ Se ha añadido una\n┃ ⚠️ advertencia al usuario.\n┣━━━━━━━━━━━━━━━━⬣\n\n┃ ❗ El mensaje infractor\n┃ ❗ ha sido eliminado.\n\n╰〔 ${fytBold("SYSTEM ACTIVE")} 〕⬣`,
+      text: `╭〔 ⚠️ ${fytBold("AURA REED")} 〕⬣\n┃ 🚫 ${fytBold("ANTI-TOXIC SYSTEM")}\n╰━━━━━━━━━━━━⬣\n\n┃ 👤 Usuario: @${userJid.split("@")[0]}\n┃ 📊 Warns: [ ${count}/${(group.data as Record<string, unknown> | undefined)?.warnLimit || 3} ]\n┃ 🛡️ Admin: ${fytBold("SYSTEM")} ⚡\n┃ 📌 Acción: Llamada de atención\n┃ 📝 Razón: ${toxicMatch.reason}\n┃ ⏰ Fecha: ${new Date().toLocaleDateString("es-CR", { timeZone: "America/Costa_Rica" })}\n\n┣━━━━━━━━━━━━━━━━⬣\n\n┃ ⚠️ Se ha añadido una\n┃ ⚠️ advertencia al usuario.\n┣━━━━━━━━━━━━━━━━⬣\n\n┃ ❗ El mensaje infractor\n┃ ❗ ha sido eliminado.\n\n╰〔 ${fytBold("SYSTEM ACTIVE")} 〕⬣`,
       mentions: [userJid],
     });
-    if (count >= (group.warnLimit || 3)) {
+    if (
+      count >=
+      Number(
+        (group.data as Record<string, unknown> | undefined)?.warnLimit || 3,
+      )
+    ) {
       await actionSock
         .groupParticipantsUpdate(groupJid, [userJid], "remove")
         .catch(() => undefined);
@@ -196,11 +212,11 @@ export async function handleGroupToxic(
 }
 
 export async function handleGroupCall(
-  sock: any,
-  call: any,
-  db: any,
+  sock: ExtendedWASocket,
+  call: GroupCallEvent,
+  db: IDatabase,
 ): Promise<void> {
-  const groupJid = call?.groupJid || call?.chatId || call?.from;
+  const groupJid = String(call?.groupJid || call?.chatId || call?.from || "");
   if (
     !groupJid?.endsWith("@g.us") ||
     !call?.id ||
@@ -214,9 +230,21 @@ export async function handleGroupCall(
   const actionSock = (await getAdminSocket(sock, groupJid)) || sock;
 
   try {
-    if (typeof sock.rejectCall === "function")
-      await sock.rejectCall(call.id, call.from || groupJid);
-    const userJid = call.from || call.participant;
+    if (
+      typeof (
+        sock as unknown as {
+          rejectCall: (id: string, from: string) => Promise<void>;
+        }
+      ).rejectCall === "function"
+    )
+      await (
+        sock as unknown as {
+          rejectCall: (id: string, from: string) => Promise<void>;
+        }
+      ).rejectCall(String(call.id), String(call.from || groupJid));
+    const userJid = String(
+      call.from || (call as Record<string, unknown>).participant || "",
+    );
     if (!userJid) return;
     const count = addWarning(
       db,
@@ -225,10 +253,15 @@ export async function handleGroupCall(
       "Intento de llamada en grupo",
     );
     await actionSock.sendMessage(groupJid, {
-      text: `╭〔 ⚠️ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣\n┃ 🚫 𝐋𝐋𝐀𝐌𝐀𝐃𝐀 𝐍𝐎 𝐏𝐄𝐑𝐌𝐈𝐓𝐈𝐃𝐀\n╰━━━━━━━━━━━━⬣\n\n┃ 👤 Usuario: @${userJid.split("@")[0]}\n┃ 📊 Warns: [ ${count}/${group.warnLimit || 3} ]\n┃ 🛡️ Razón: Llamada no permitida\n╰〔 ⚡ 𝐒𝐘𝐒𝐓𝐄𝐌 〕⬣`,
+      text: `╭〔 ⚠️ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣\n┃ 🚫 𝐋𝐋𝐀𝐌𝐀𝐃𝐀 𝐍𝐎 𝐏𝐄𝐑𝐌𝐈𝐓𝐈𝐃𝐀\n╰━━━━━━━━━━━━⬣\n\n┃ 👤 Usuario: @${userJid.split("@")[0]}\n┃ 📊 Warns: [ ${count}/${(group.data as Record<string, unknown> | undefined)?.warnLimit || 3} ]\n┃ 🛡️ Razón: Llamada no permitida\n╰〔 ⚡ 𝐒𝐘𝐒𝐓𝐄𝐌 〕⬣`,
       mentions: [userJid],
     });
-    if (count >= (group.warnLimit || 3)) {
+    if (
+      count >=
+      Number(
+        (group.data as Record<string, unknown> | undefined)?.warnLimit || 3,
+      )
+    ) {
       await actionSock
         .groupParticipantsUpdate(groupJid, [userJid], "remove")
         .catch(() => undefined);
@@ -242,13 +275,17 @@ export async function handleGroupCall(
 }
 
 export async function handleGroupStatus(
-  sock: any,
-  message: any,
-  db: any,
+  sock: ExtendedWASocket,
+  message: proto.IWebMessageInfo,
+  db: IDatabase,
 ): Promise<boolean> {
-  const statusMessage =
-    message.message?.groupStatusMentionMessage ||
-    message.message?.groupStatusMessageV2;
+  const statusMessage = (message.message?.groupStatusMentionMessage ||
+    message.message?.groupStatusMessageV2) as
+    | (proto.Message.IFutureProofMessage & {
+        statusKey?: proto.IMessageKey | null;
+        key?: proto.IMessageKey | null;
+      })
+    | undefined;
   if (!statusMessage) return false;
 
   const groupJid =

@@ -3,24 +3,37 @@ import {
   generateWAMessage,
   generateWAMessageFromContent,
   jidNormalizedUser,
+  type proto,
+  type AnyMessageContent,
+  type MiscMessageGenerationOptions,
+  type WAMessage,
 } from "@whiskeysockets/baileys";
+import type {
+  ExtendedWASocket,
+  AlbumItem,
+  SendMessageContent,
+} from "../types/index.d.ts";
 
-type AlbumItem = {
-  image?: unknown;
-  video?: unknown;
-  [key: string]: unknown;
-};
+export type { AlbumItem, SendMessageContent };
 
 const ALBUM_DELAY = Number(process.env.ALBUM_ITEM_DELAY_MS || 900);
 const MAX_ITEMS = Number(process.env.MAX_ALBUM_ITEMS || 6);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function isRateLimitError(error: any): boolean {
-  const status = error?.status || error?.statusCode || error?.output?.statusCode;
+function isRateLimitError(error: unknown): boolean {
+  const err = error as Record<string, unknown> | undefined;
+  const status =
+    err?.status ||
+    err?.statusCode ||
+    (err?.output as Record<string, unknown> | undefined)?.statusCode;
   if (status === 429) return true;
 
-  const text = String(error?.message || error?.data?.message || "").toLowerCase();
+  const text = String(
+    err?.message ||
+      (err?.data as Record<string, unknown> | undefined)?.message ||
+      "",
+  ).toLowerCase();
   return (
     text.includes("429") ||
     text.includes("rate") ||
@@ -30,54 +43,59 @@ function isRateLimitError(error: any): boolean {
 }
 
 export async function sendMessageWithRateLimit(
-  socket: any,
+  socket: ExtendedWASocket,
   jid: string,
-  content: any,
-  options?: any,
+  content: SendMessageContent,
+  options?: MiscMessageGenerationOptions,
 ) {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      return await socket.sendMessage(jid, content, options);
-    } catch (error) {
+      return await socket.sendMessage(
+        jid,
+        content as AnyMessageContent,
+        options,
+      );
+    } catch (error: unknown) {
       if (attempt === 3 || !isRateLimitError(error)) throw error;
 
-      const retryAfter = Number(
-        error?.response?.headers?.["retry-after"] ||
-          error?.headers?.["retry-after"] ||
-          0,
-      );
+      const err = error as Record<string, unknown> | undefined;
+      const resp = err?.response as Record<string, unknown> | undefined;
+      const headers = (resp?.headers || err?.headers) as
+        Record<string, unknown> | undefined;
+      const retryAfter = Number(headers?.["retry-after"] || 0);
       await sleep(Math.max(retryAfter * 1000, 2000 * 2 ** (attempt - 1)));
     }
   }
 }
 
 async function relayWithRateLimit(
-  socket: any,
+  socket: ExtendedWASocket,
   jid: string,
-  message: any,
+  message: proto.IMessage | null | undefined,
   messageId?: string,
 ) {
+  if (!message) return;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       return await socket.relayMessage(jid, message, { messageId });
-    } catch (error) {
+    } catch (error: unknown) {
       if (attempt === 3 || !isRateLimitError(error)) throw error;
 
-      const retryAfter = Number(
-        error?.response?.headers?.["retry-after"] ||
-          error?.headers?.["retry-after"] ||
-          0,
-      );
+      const err = error as Record<string, unknown> | undefined;
+      const resp = err?.response as Record<string, unknown> | undefined;
+      const headers = (resp?.headers || err?.headers) as
+        Record<string, unknown> | undefined;
+      const retryAfter = Number(headers?.["retry-after"] || 0);
       await sleep(Math.max(retryAfter * 1000, 1500 * 2 ** (attempt - 1)));
     }
   }
 }
 
 export async function sendAlbumMessage(
-  socket: any,
+  socket: ExtendedWASocket,
   jid: string,
   items: AlbumItem[],
-  quoted?: any,
+  quoted?: proto.IWebMessageInfo | WAMessage,
 ) {
   if (!Array.isArray(items) || items.length === 0) return null;
 
@@ -94,7 +112,7 @@ export async function sendAlbumMessage(
       messageContextInfo: { messageSecret: crypto.randomBytes(32) },
       albumMessage: { expectedImageCount, expectedVideoCount },
     },
-    { quoted, userJid },
+    { quoted: quoted as WAMessage | undefined, userJid },
   );
 
   await relayWithRateLimit(socket, jid, album.message, album.key.id);
@@ -103,10 +121,14 @@ export async function sendAlbumMessage(
     if (index > 0) await sleep(ALBUM_DELAY);
 
     try {
-      const mediaMessage = await generateWAMessage(jid, albumItems[index] as any, {
-        upload: socket.waUploadToServer,
-        userJid,
-      });
+      const mediaMessage = await generateWAMessage(
+        jid,
+        albumItems[index] as AnyMessageContent,
+        {
+          upload: socket.waUploadToServer,
+          userJid,
+        },
+      );
       mediaMessage.message!.messageContextInfo = {
         messageSecret: crypto.randomBytes(32),
         messageAssociation: {
@@ -114,8 +136,13 @@ export async function sendAlbumMessage(
           parentMessageKey: album.key,
         },
       };
-      await relayWithRateLimit(socket, jid, mediaMessage.message, mediaMessage.key.id);
-    } catch (error) {
+      await relayWithRateLimit(
+        socket,
+        jid,
+        mediaMessage.message,
+        mediaMessage.key.id,
+      );
+    } catch (error: unknown) {
       console.error("[album] No se pudo enviar un elemento:", error);
     }
   }

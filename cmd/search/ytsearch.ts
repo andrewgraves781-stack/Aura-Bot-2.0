@@ -1,3 +1,5 @@
+import type { WAMessage } from "@whiskeysockets/baileys";
+import type { CommandContext } from "../../types/index.d.ts";
 import yts from "yt-search";
 import { readFile } from "node:fs/promises";
 import {
@@ -12,7 +14,7 @@ export default {
   name: ["ytsearch", "yts", "plays"],
   category: "search",
   description: "Busca videos en YouTube.",
-  async run({ args, reply, react, sock, from, msg, sender }: any) {
+  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query) return reply("⚠️ Debes especificar qué buscar.");
     await react("🔍");
@@ -47,16 +49,18 @@ export default {
         forwardingScore: 0,
       });
       const previewMessage = generateWAMessageFromContent(from, preview, {
-        quoted: msg,
+        quoted: msg as unknown as WAMessage,
         userJid: sock.user?.id,
       });
       await sock.relayMessage(from, previewMessage.message, {
         messageId: previewMessage.key.id,
       });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
-      return reply({ text: `❌ Error: ${error?.message || "No se pudo buscar en YouTube."}` });
+      return reply({
+        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo buscar en YouTube."}`,
+      });
     }
   },
 };

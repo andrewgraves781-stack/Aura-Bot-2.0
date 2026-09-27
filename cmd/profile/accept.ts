@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   clearPendingProfileAction,
   getPendingProfileAction,
@@ -9,7 +10,7 @@ export default {
   name: ["accept", "aceptar", "acepto"],
   description: "Acepta una propuesta de matrimonio o divorcio.",
   category: "profile",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const action =
       getPendingProfileAction("marry", ctx.sender) ??
       getPendingProfileAction("divorce", ctx.sender);

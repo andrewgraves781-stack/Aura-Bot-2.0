@@ -1,3 +1,4 @@
+import type { CommandContext, GroupWarnEntry } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -7,7 +8,7 @@ export default {
   groupOnly: true,
   adminOnly: true,
   botAdmin: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const context = ctx.msg?.message?.extendedTextMessage?.contextInfo;
     const target =
       context?.mentionedJid?.[0] ||
@@ -27,7 +28,7 @@ export default {
       });
     const content = history
       .map(
-        (warn: any, index: number) =>
+        (warn: GroupWarnEntry, index: number) =>
           `┃ ${index + 1}. ${warn.reason || "Sin motivo"} • ${warn.date || "Sin fecha"}`,
       )
       .join("\n");

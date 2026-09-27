@@ -1,9 +1,10 @@
+import type { CommandContext } from "../../types/index.d.ts";
 export default {
   name: ["modself", "setmodself"],
   description: "Activa o desactiva el modo self de moderación.",
   category: "system",
   modOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const value = String(ctx.args?.[0] ?? "").toLowerCase();
     if (!["on", "off", "true", "false", "1", "0"].includes(value)) {
       return ctx.reply(`⚠️ Uso: ${ctx.usedPrefix ?? "."}modself on|off`);

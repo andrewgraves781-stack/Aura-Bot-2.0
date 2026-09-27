@@ -1,9 +1,10 @@
+import type { CommandContext } from "../../types/index.d.ts";
 export default {
   name: ["modprefix", "setmodprefix", "delmodprefix", "deletemodprefix"],
   description: "Cambia el prefijo reservado para moderadores.",
   category: "system",
   modOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     if (["delmodprefix", "deletemodprefix"].includes(ctx.cmdName)) {
       ctx.db.setBot(ctx.botJid, { modPrefix: null });
       return ctx.reply(

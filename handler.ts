@@ -18,10 +18,34 @@ import {
   NOT_ADMIN,
   NOT_MOD,
   NOT_PREMIUM,
-  formatPlainText,
 } from "./core/socketText.ts";
 import { db } from "./dbController/db.ts";
 import { handleGroupStatus, handleGroupToxic } from "./core/groupModeration.ts";
+
+import type {
+  GroupMetadata,
+  GroupParticipant,
+  WAMessage,
+} from "@whiskeysockets/baileys";
+import type {
+  ExtendedWASocket,
+  IDatabase,
+  CommandPlugin,
+  CommandContext,
+  ButtonItem,
+  OptionSection,
+  OptionRow,
+  ReplyContent,
+  ContactMetadata,
+  HandlerConfig,
+  HandlerLogger,
+  HandlerOptions,
+  TopMsgUser,
+  DatabaseBot,
+  DatabaseUser,
+} from "./types/index.d.ts";
+
+export type { ContactMetadata, HandlerConfig, HandlerLogger, HandlerOptions };
 
 function getMessageWeek(date = new Date()): string {
   const current = new Date(
@@ -36,38 +60,7 @@ function getMessageWeek(date = new Date()): string {
   return `${current.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-export type ContactMetadata = {
-  user?: string | null;
-  jid?: string | null;
-  lid?: string | null;
-  phoneNumber?: string | null;
-};
-
-export type HandlerConfig = {
-  prefix?: string | string[];
-  ownerNumber?: string[];
-  coOwners?: string[];
-};
-
-export type HandlerLogger = {
-  message?: (...args: any[]) => void;
-  warn?: (...args: any[]) => void;
-  error?: (...args: any[]) => void;
-  cmdExec?: (...args: any[]) => void;
-};
-
-export type HandlerOptions = {
-  config?: HandlerConfig;
-  db?: any;
-  logger?: HandlerLogger;
-  plugins?: Map<string, any>;
-  getPlugins?: () => Map<string, any>;
-  checkAntilink?: (args: any) => Promise<boolean>;
-  handleChatXp?: (sender: string) => void;
-  handleCommandXp?: (sender: string) => void;
-};
-
-const GROUP_METADATA_CACHE = new LRUCache<string, any>({
+const GROUP_METADATA_CACHE = new LRUCache<string, GroupMetadata>({
   max: 500,
   ttl: 10 * 60 * 1000,
 });
@@ -77,7 +70,7 @@ const CONTACT_METADATA_CACHE = new LRUCache<string, ContactMetadata>({
   ttl: 5 * 60 * 1000,
 });
 
-const groupCache = new LRUCache<string, any>({
+const groupCache = new LRUCache<string, GroupMetadata>({
   max: 500,
   ttl: 10 * 60 * 1000,
 });
@@ -161,17 +154,20 @@ function getPhoneNumberFromJid(jid?: string | null): string | null {
 }
 
 function normalizeContactMetadata(
-  input?: Partial<ContactMetadata> | any | null,
+  input?: Partial<ContactMetadata> | Record<string, unknown> | null,
 ): ContactMetadata {
-  const jid = input?.jid ?? input?.id ?? null;
-  const lid = input?.lid ?? null;
-  const user = input?.user ?? input?.username ?? input?.notify ?? null;
+  const data = input as Record<string, unknown> | undefined;
+  const jid = (input?.jid ?? data?.id ?? null) as string | null;
+  const lid = (input?.lid ?? null) as string | null;
+  const user = (input?.user ?? data?.username ?? data?.notify ?? null) as
+    string | null;
 
   const resolvedJid = jid ? jidNormalizedUser(jid) : null;
   const resolvedLid = lid ? jidNormalizedUser(lid) : null;
 
   const candidatePhoneNumber =
-    input?.phoneNumber ?? getPhoneNumberFromJid(resolvedJid ?? null);
+    (typeof input?.phoneNumber === "string" ? input.phoneNumber : null) ??
+    getPhoneNumberFromJid(resolvedJid ?? null);
 
   return {
     user,
@@ -185,7 +181,7 @@ function normalizeContactMetadata(
 }
 
 export function buildUserMetadataMap(
-  users: Array<Partial<ContactMetadata> | any> = [],
+  users: Array<Partial<ContactMetadata> | Record<string, unknown>> = [],
 ): Map<string, ContactMetadata> {
   const map = new Map<string, ContactMetadata>();
 
@@ -200,11 +196,12 @@ export function buildUserMetadataMap(
 }
 
 export function resolveUserMetadata(
-  input?: Partial<ContactMetadata> | any | null,
+  input?: Partial<ContactMetadata> | Record<string, unknown> | null,
 ): ContactMetadata | null {
   if (!input) return null;
 
-  const key = input.jid ?? input.lid ?? input.id ?? null;
+  const data = input as Record<string, unknown>;
+  const key = (input.jid ?? input.lid ?? data.id ?? null) as string | null;
   if (!key) return normalizeContactMetadata(input);
 
   const cached = CONTACT_METADATA_CACHE.get(key);
@@ -215,10 +212,13 @@ export function resolveUserMetadata(
   return resolved;
 }
 
-export async function getGroupMetadata(jid: string, sock: any) {
+export async function getGroupMetadata(
+  jid: string,
+  sock: ExtendedWASocket,
+): Promise<GroupMetadata | null> {
   const normalizedJid = jidNormalizedUser(jid);
   if (GROUP_METADATA_CACHE.has(normalizedJid)) {
-    return GROUP_METADATA_CACHE.get(normalizedJid);
+    return GROUP_METADATA_CACHE.get(normalizedJid) ?? null;
   }
 
   try {
@@ -241,13 +241,13 @@ export function invalidateGroupCache(groupJid: string) {
 
 async function resolveLid(
   lidJid: string | null | undefined,
-  groupMeta: any,
-  sock: any,
+  groupMeta: GroupMetadata | null,
+  sock: ExtendedWASocket,
 ) {
   if (!lidJid || !lidJid.endsWith("@lid")) return lidJid;
 
   const match = groupMeta?.participants?.find(
-    (p: any) => cleanJid(p.id || "") === lidJid,
+    (p: GroupParticipant) => cleanJid(p.id || "") === lidJid,
   );
   if (match?.phoneNumber) {
     return cleanJid(match.phoneNumber);
@@ -268,7 +268,7 @@ async function matchesConfiguredNumber(
   numberList: Array<string | number | null | undefined>,
   senderNum: string,
   rawLid: string,
-  sock: any,
+  sock: ExtendedWASocket,
 ) {
   if (!Array.isArray(numberList)) return false;
 
@@ -308,11 +308,11 @@ async function matchesConfiguredNumber(
 }
 
 export async function handleMessage(
-  sock: any,
-  rawMsg: any,
+  sock: ExtendedWASocket,
+  rawMsg: proto.IWebMessageInfo,
   botLabel = "MAIN",
   mainBotNum: string | null = null,
-  activeBotsLive: any[] = [],
+  activeBotsLive: ExtendedWASocket[] = [],
   runtimeOptions: HandlerOptions = {},
 ) {
   try {
@@ -349,7 +349,7 @@ export async function handleMessage(
     const participantRaw = isGroup
       ? msg.key?.participant || msg.participant || ""
       : "";
-    const participantReal = isGroup ? msg.key?.participantAlt || "" : "";
+    const participantReal = isGroup ? msg.key?.participant || "" : "";
 
     let senderJid;
     if (isGroup) {
@@ -360,7 +360,7 @@ export async function handleMessage(
           ? participantReal
           : participantRaw;
     } else {
-      const remoteAlt = msg.key?.remoteJidAlt || "";
+      const remoteAlt = msg.key?.remoteJid || "";
       senderJid =
         from.endsWith("@lid") && remoteAlt && !remoteAlt.endsWith("@lid")
           ? remoteAlt
@@ -378,7 +378,7 @@ export async function handleMessage(
     let sender = cleanJid(senderJid);
     const senderLid = cleanJid(senderLidJid);
     const botJid = cleanJid(sock.user?.id || "");
-    const botRecord = runtimeDb.getBot?.(botJid) ?? {};
+    const botRecord: Partial<DatabaseBot> = runtimeDb.getBot?.(botJid) ?? {};
     const modPrefix = String(botRecord.modPrefix ?? "").trim();
 
     const body =
@@ -388,6 +388,17 @@ export async function handleMessage(
       msg.message?.videoMessage?.caption ||
       msg.message?.buttonsResponseMessage?.selectedButtonId ||
       msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+      (() => {
+        const response =
+          msg.message?.interactiveResponseMessage?.nativeFlowResponseMessage;
+        if (!response?.paramsJson) return "";
+        try {
+          const params = JSON.parse(response.paramsJson);
+          return params.id || params.row_id || params.selected_id || "";
+        } catch {
+          return "";
+        }
+      })() ||
       msg.message?.templateButtonReplyMessage?.selectedId ||
       "";
 
@@ -458,7 +469,7 @@ export async function handleMessage(
     const text = args.join(" ");
 
     let groupName = "";
-    let groupMeta: any = null;
+    let groupMeta: GroupMetadata | null = null;
 
     if (isGroup) {
       if (groupCache.has(from)) {
@@ -498,7 +509,8 @@ export async function handleMessage(
     const senderNum = sender.split("@")[0];
 
     if (msg.pushName) {
-      const currentUser = runtimeDb.getUser?.(sender) ?? {};
+      const currentUser: Partial<DatabaseUser> =
+        runtimeDb.getUser?.(sender) ?? {};
       const hasResolvedPhone = !sender.endsWith("@lid");
       const nextContact = {
         jid: hasResolvedPhone ? sender : null,
@@ -520,18 +532,18 @@ export async function handleMessage(
       const groupData = runtimeDb.getGroup(from);
       const currentWeek = getMessageWeek();
       const storedTopMsgUsers = Array.isArray(groupData.topMsgUsers)
-        ? groupData.topMsgUsers
+        ? (groupData.topMsgUsers as TopMsgUser[])
         : [];
       const topMsgUsers =
         storedTopMsgUsers.length > 0 &&
-        storedTopMsgUsers.some((user: any) => user.week !== currentWeek)
+        storedTopMsgUsers.some((user: TopMsgUser) => user.week !== currentWeek)
           ? []
           : storedTopMsgUsers;
       const currentLid = senderLid || rawSenderLid || null;
       const currentPushName =
         msg.pushName || runtimeDb.getUser?.(sender)?.pushName || "Usuario";
       const entry = topMsgUsers.find(
-        (user: any) =>
+        (user: TopMsgUser) =>
           (user.jid && user.jid === sender) ||
           (currentLid && user.lid && user.lid === currentLid),
       );
@@ -555,7 +567,8 @@ export async function handleMessage(
       runtimeDb.setGroup(from, { topMsgUsers });
     }
     const botUserJid = cleanJid(sock.user?.id || "");
-    const storedBot = runtimeDb.getBot?.(botUserJid) ?? botRecord;
+    const storedBot: Partial<DatabaseBot> =
+      runtimeDb.getBot?.(botUserJid) ?? botRecord;
     const botIdentities = [
       botUserJid,
       sock.subBotId,
@@ -610,7 +623,7 @@ export async function handleMessage(
       const senderJidClean = cleanJid(sender);
 
       const matchesParticipant = (
-        p: any,
+        p: GroupParticipant,
         targetJid: string,
         targetLid: string,
       ) => {
@@ -624,11 +637,13 @@ export async function handleMessage(
         );
       };
 
-      const botParticipant = groupMeta.participants.find((p: any) =>
-        matchesParticipant(p, botJidClean, botLidClean),
+      const botParticipant = groupMeta.participants.find(
+        (p: GroupParticipant) =>
+          matchesParticipant(p, botJidClean, botLidClean),
       );
-      const senderParticipant = groupMeta.participants.find((p: any) =>
-        matchesParticipant(p, senderJidClean, senderLid),
+      const senderParticipant = groupMeta.participants.find(
+        (p: GroupParticipant) =>
+          matchesParticipant(p, senderJidClean, senderLid),
       );
 
       isAdmin =
@@ -736,9 +751,12 @@ export async function handleMessage(
     if (!isCmd) {
       const hangman = pluginMap.get("ahorcado");
       if (hangman?.handleReply) {
-        const reply = async (content: any) => {
-          if (typeof content === "string") content = { text: content };
-          return sock.sendMessage(from, content, { quoted: msg });
+        const reply = async (content: ReplyContent) => {
+          const msg2send =
+            typeof content === "string" ? { text: content } : content;
+          return sock.sendMessage(from, msg2send, {
+            quoted: msg as unknown as WAMessage,
+          });
         };
         const handled = await hangman.handleReply({
           sock,
@@ -777,7 +795,7 @@ export async function handleMessage(
       return await sock.sendMessage(
         from,
         { text: `${NOT_CMD_FOUND({ cmdName, prefix: usedPrefix ?? "." })}` },
-        { quoted: msg },
+        { quoted: msg as unknown as WAMessage },
       );
     }
 
@@ -812,26 +830,28 @@ export async function handleMessage(
       isBotUser,
       resolveLid: (lidJid: string) => resolveLid(lidJid, groupMeta, sock),
       clearGroupCache: () => groupCache.delete(from),
-      reply: async (content: any) => {
-        if (typeof content === "string") content = { text: content };
-        if (typeof content?.text === "string") {
-          content = { ...content, text: formatPlainText(content.text) };
-        }
-        if (content.text !== undefined) {
-          const extra = content.mentions || [];
-          content.mentions = [...new Set([sender, ...extra])];
+      reply: async (content: ReplyContent) => {
+        const sendable =
+          typeof content === "string" ? { text: content } : { ...content };
+        if (typeof sendable.text === "string") {
+          const extra = (sendable as { mentions?: string[] }).mentions || [];
+          (sendable as { mentions?: string[] }).mentions = [
+            ...new Set([sender, ...extra]),
+          ];
         }
         try {
-          return await sock.sendMessage(from, content, { quoted: msg });
-        } catch (e1: any) {
+          return await sock.sendMessage(from, sendable, {
+            quoted: msg as unknown as WAMessage,
+          });
+        } catch (e1: unknown) {
           logger.warn?.(
-            `[${botLabel}] reply con quoted falló (${e1.message}), reintentando sin quoted...`,
+            `[${botLabel}] reply con quoted falló (${e1 instanceof Error ? e1.message : String(e1)}), reintentando sin quoted...`,
           );
           try {
-            return await sock.sendMessage(from, content);
-          } catch (e2: any) {
+            return await sock.sendMessage(from, sendable);
+          } catch (e2: unknown) {
             logger.error?.(
-              `[${botLabel}] reply sin quoted también falló: ${e2.message} | from: ${from}`,
+              `[${botLabel}] reply sin quoted también falló: ${e2 instanceof Error ? e2.message : String(e2)} | from: ${from}`,
             );
           }
         }
@@ -841,13 +861,18 @@ export async function handleMessage(
           return await sock.sendMessage(from, {
             react: { text: emoji, key: msg.key },
           });
-        } catch (e: any) {
+        } catch (e: unknown) {
           logger.warn?.(
-            `[${botLabel}] react falló: ${e.message} | from: ${from}`,
+            `[${botLabel}] react falló: ${e instanceof Error ? e.message : String(e)} | from: ${from}`,
           );
         }
       },
-      copy: async ( text: string, copyCode: string, buttonText = "📋 Copiar", footer?: string,) => {
+      copy: async (
+        text: string,
+        copyCode: string,
+        buttonText = "📋 Copiar",
+        footer?: string,
+      ) => {
         try {
           const copyMessage = generateWAMessageFromContent(
             from,
@@ -873,19 +898,19 @@ export async function handleMessage(
                     messageVersion: 2,
                   }),
               }),
-            } as any,
+            } as proto.IMessage,
             {
               userJid: sock.user?.id || from,
-              quoted: msg,
+              quoted: msg as unknown as WAMessage,
             },
           );
           return await sock.relayMessage(from, copyMessage.message, {
             messageId: copyMessage.key.id || undefined,
             additionalNodes: [createNativeFlowNode()],
           });
-        } catch (e: any) {
+        } catch (e: unknown) {
           logger.warn?.(
-            `[${botLabel}] copy falló: ${e?.message || e} | from: ${from}`,
+            `[${botLabel}] copy falló: ${e instanceof Error ? e.message : String(e) || e} | from: ${from}`,
           );
           return await sock.sendMessage(
             from,
@@ -893,7 +918,85 @@ export async function handleMessage(
               text: `${text}\n\n🔑 Código: *${copyCode}*`,
               footer: footer || "",
             },
-            { quoted: msg },
+            { quoted: msg as unknown as WAMessage },
+          );
+        }
+      },
+      buttons: async (text: string, buttons: ButtonItem[], footer?: string) => {
+        try {
+          return await sock.sendMessage(from, {
+            text,
+            footer: footer || "",
+            buttons,
+            headerType: 1,
+          } as Parameters<typeof sock.sendMessage>[1]);
+        } catch (e: unknown) {
+          logger.warn?.(
+            `[${botLabel}] buttons falló: ${e instanceof Error ? e.message : String(e)} | from: ${from}`,
+          );
+        }
+      },
+      options: async (
+        text: string,
+        sections: OptionSection[],
+        footer?: string,
+        buttonText = "Ver opciones",
+        title = "",
+      ) => {
+        try {
+          const interactive = generateWAMessageFromContent(
+            from,
+            {
+              interactiveMessage: proto.Message.InteractiveMessage.create({
+                header: proto.Message.InteractiveMessage.Header.create({
+                  title,
+                  hasMediaAttachment: false,
+                }),
+                body: proto.Message.InteractiveMessage.Body.create({ text }),
+                footer: proto.Message.InteractiveMessage.Footer.create({
+                  text: footer || "",
+                }),
+                nativeFlowMessage:
+                  proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                    messageParamsJson: JSON.stringify({}),
+                    buttons: [
+                      {
+                        name: "single_select",
+                        buttonParamsJson: JSON.stringify({
+                          title: buttonText,
+                          sections: sections.map((section: OptionSection) => ({
+                            title: String(section.title || ""),
+                            rows: (Array.isArray(section.rows)
+                              ? section.rows
+                              : []
+                            ).map((row: OptionRow) => ({
+                              id: String(row.rowId || ""),
+                              title: String(row.title || ""),
+                              description: String(row.description || ""),
+                            })),
+                          })),
+                        }),
+                      },
+                    ],
+                    messageVersion: 2,
+                  }),
+              }),
+            } as proto.IMessage,
+            {
+              userJid: sock.user?.id || from,
+              quoted: msg as unknown as WAMessage,
+            },
+          );
+          return await sock.relayMessage(from, interactive.message, {
+            messageId: interactive.key.id || undefined,
+            additionalNodes: [createNativeFlowNode()],
+          });
+        } catch (e: unknown) {
+          console.error(`[${botLabel}] options falló:`, e);
+          return sock.sendMessage(
+            from,
+            { text: "❌ No pude mostrar las opciones. Inténtalo de nuevo." },
+            { quoted: msg as unknown as WAMessage },
           );
         }
       },
@@ -901,7 +1004,7 @@ export async function handleMessage(
       getPluginCategories: () => [
         ...new Set(
           [...pluginMap.values()]
-            .map((item: any) => String(item?.category ?? "").trim())
+            .map((item: CommandPlugin) => String(item?.category ?? "").trim())
             .filter(Boolean),
         ),
       ],
@@ -952,7 +1055,7 @@ export async function handleMessage(
         botLabel,
       });
       if (isGroup) runtimeOptions.handleCommandXp?.(sender);
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.cmdExec?.({
         cmdName,
         sender: senderNum,
@@ -960,18 +1063,28 @@ export async function handleMessage(
         ms: Date.now() - start,
         botLabel,
       });
-      logger.error?.(`Comando ${cmdName}: ${e.message}`);
+      logger.error?.(
+        `Comando ${cmdName}: ${e instanceof Error ? e.message : String(e)}`,
+      );
       await ctx.react("❌");
 
-      if (e.message?.toLowerCase().includes("forbidden")) {
+      if (
+        (e instanceof Error ? e.message : "")
+          .toLowerCase()
+          .includes("forbidden")
+      ) {
         await ctx.reply({ text: NOT_BOT_ADMIN() });
       } else {
-        const errorDetails = e.stack || e.message || String(e);
+        const errorDetails =
+          e instanceof Error ? e.stack || e.message : String(e);
         await ctx.reply({ text: ERROR_CMD({ cmdName, errorDetails }) });
       }
     }
-  } catch (e: any) {
-    loggerError(runtimeOptions.logger, `handleMessage: ${e.message}`);
+  } catch (e: unknown) {
+    loggerError(
+      runtimeOptions.logger,
+      `handleMessage: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }
 

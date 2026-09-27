@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   cooldownText,
   formatCoins,
@@ -9,7 +10,7 @@ export default {
   name: ["cf", "caraocruz", "coinflip"],
   category: "economy",
   description: "Apuesta monedas a cara o cruz.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const user = getEconomyUser(ctx.from, ctx.sender, { lastCf: 0 });
     const amount = Number.parseInt(ctx.args?.[0] ?? "", 10);
     const choice = String(ctx.args?.[1] ?? "").toLowerCase();

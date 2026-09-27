@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   cooldownText,
   formatCoins,
@@ -10,7 +11,7 @@ export default {
   name: ["weekly", "semanal", "memanal"],
   category: "economy",
   description: "Reclama tu recompensa semanal con sistema de racha.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const user = getEconomyUser(ctx.from, ctx.sender, {
       lastWeekly: 0,
       weeklyStreak: 0,

@@ -6,6 +6,11 @@ import {
   formatCount,
 } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
+import type {
+  CommandContext,
+  TikTokSearchResponse,
+  TikTokDownloadData,
+} from "../../types/index.d.ts";
 
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
 const KEY = DL_CONFIG.alya.API_KEY;
@@ -15,7 +20,7 @@ export default {
   name: ["dtk", "dtt", "dttv", "doctiktok", "dtkmp4"],
   category: "download",
   description: "Busca y descarga videos de TikTok como documento.",
-  async run({ args, reply, react }: any) {
+  async run({ args, reply, react }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query)
       return reply("⚠️ Proporciona una búsqueda o un enlace válido de TikTok.");
@@ -23,18 +28,18 @@ export default {
     try {
       let url = query;
       if (!TIKTOK_URL.test(query)) {
-        const search = await requestJson(
+        const search = await requestJson<TikTokSearchResponse>(
           `${API}/search/tiktok?query=${encodeURIComponent(query)}&key=${KEY}`,
         );
         url = search?.data?.[0]?.url || "";
       }
       if (!url) throw new Error("No se encontró ningún enlace válido.");
-      const data = await requestJson(
+      const data = await requestJson<TikTokDownloadData>(
         `${API}/dl/tiktokv2?url=${encodeURIComponent(url)}&key=${KEY}`,
         60000,
       );
       const entries = Array.isArray(data?.data) ? data.data : [];
-      const videoUrl = entries.find((item: any) => item?.url)?.url;
+      const videoUrl = entries.find((item) => item?.url)?.url;
       if (!data?.status || !videoUrl)
         throw new Error("La API no devolvió un video descargable.");
       const author =
@@ -49,10 +54,14 @@ export default {
         caption,
       });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo descargar el video.";
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar el video."}`,
+        text: `❌ Error: ${message}`,
       });
     }
   },

@@ -1,3 +1,8 @@
+import type {
+  CommandContext,
+  WaBanCheckResponse,
+} from "../../types/index.d.ts";
+import type { proto } from "@whiskeysockets/baileys";
 import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
 
@@ -9,12 +14,15 @@ function validNumber(value: string): boolean {
   return /^\d{7,15}$/.test(value);
 }
 
-function getNumber(msg: any, args: string[]): string {
-  const mentioned = msg?.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-  return normalizeNumber(args.join("")) || normalizeNumber(mentioned?.split("@")[0]);
+function getNumber(msg: proto.IWebMessageInfo, args: string[]): string {
+  const mentioned =
+    msg?.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+  return (
+    normalizeNumber(args.join("")) || normalizeNumber(mentioned?.split("@")[0])
+  );
 }
 
-function formatResult(number: string, response: any): string {
+function formatResult(number: string, response: WaBanCheckResponse): string {
   const result = response?.resultado?.data;
   if (!result || typeof result.isBanned !== "boolean") {
     throw new Error("La API devolvió una respuesta inválida.");
@@ -44,7 +52,7 @@ export default {
   name: ["checkban", "checknum"],
   category: "utils",
   description: "Verifica si un número de WhatsApp está baneado.",
-  async run({ msg, args, usedPrefix, reply, react }: any) {
+  async run({ msg, args, usedPrefix, reply, react }: CommandContext) {
     const number = getNumber(msg, args);
     if (!validNumber(number)) {
       return reply({
@@ -58,13 +66,18 @@ export default {
       const url = `${base}/tools/wabancheck?lang=es&apikey=${encodeURIComponent(DL_CONFIG.lempi.API_KEY || "")}&number=${number}`;
       const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data: any = await response.json();
+      const data = (await response.json()) as WaBanCheckResponse;
       await react(data?.resultado?.data?.isBanned ? "🔴" : "✅");
       return reply({ text: formatResult(number, data) });
-    } catch (error: any) {
-      console.error("[checkban] Error:", error?.message || error);
+    } catch (error: unknown) {
+      console.error(
+        "[checkban] Error:",
+        error instanceof Error ? error.message : String(error) || error,
+      );
       await react("❌");
-      return reply({ text: `❌ No se pudo consultar el estado de ${number}. Intenta nuevamente más tarde.` });
+      return reply({
+        text: `❌ No se pudo consultar el estado de ${number}. Intenta nuevamente más tarde.`,
+      });
     }
   },
 };

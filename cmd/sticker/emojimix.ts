@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
 import {
@@ -11,7 +12,7 @@ export default {
   name: ["emojimix", "ekitchen", "emojikitchen"],
   category: "sticker",
   description: "Combina dos emojis en un sticker.",
-  async run({ args, db, sender, msg, react, reply }: any) {
+  async run({ args, db, sender, msg, react, reply }: CommandContext) {
     const emojis = extractEmojis(args.join(" "));
     if (emojis.length < 2)
       return reply("⚠️ Envía dos emojis. Ejemplo: .emojimix 🥺🔥");
@@ -38,10 +39,10 @@ export default {
       );
       await react("✅");
       return reply({ sticker: finalSticker, mimetype: "image/webp" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ⚠️ ERROR AL CREAR STICKER\n╰━━━━━━━━━━━━⬣\n\n┃ > ${error?.message || "No se pudo combinar esos emojis."}\n╰〔 ⚡ SYSTEM 〕⬣`,
+        text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ⚠️ ERROR AL CREAR STICKER\n╰━━━━━━━━━━━━⬣\n\n┃ > ${error instanceof Error ? error.message : String(error) || "No se pudo combinar esos emojis."}\n╰〔 ⚡ SYSTEM 〕⬣`,
       });
     }
   },

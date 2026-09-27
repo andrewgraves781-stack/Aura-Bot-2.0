@@ -1,3 +1,5 @@
+import type { GroupParticipant } from "@whiskeysockets/baileys";
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -7,7 +9,7 @@ export default {
   groupOnly: true,
   adminOnly: true,
   botAdmin: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const context = ctx.msg?.message?.extendedTextMessage?.contextInfo;
     const target = context?.mentionedJid?.[0] || context?.participant;
     if (!target)
@@ -16,7 +18,8 @@ export default {
       });
     const group = ctx.db.getGroup(ctx.from);
     const isAdmin = ctx.groupMeta?.participants?.some(
-      (participant: any) => participant.id === target && participant.admin,
+      (participant: GroupParticipant) =>
+        participant.id === target && Boolean(participant.admin),
     );
     if (isAdmin)
       return ctx.reply({

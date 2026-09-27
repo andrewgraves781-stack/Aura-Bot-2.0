@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import qr from "qr-image";
 import { requestSubBotLink } from "../../core/subbotManager.ts";
 import { IS_SUBBOT_ONLINE } from "../../core/socketText.ts";
@@ -8,18 +9,20 @@ export default {
   category: "socket",
   ownerOnly: true,
 
-  async run({ sender, reply }: any) {
+  async run({ sender, reply }: CommandContext) {
     await reply({ text: "⏳ Preparando el código QR de vinculación..." });
     await requestSubBotLink({
       requester: sender,
       method: "qr",
-      onQr: (value) =>
-        reply({
+      onQr: async (value) => {
+        void reply({
           image: qr.imageSync(value, { type: "png" }),
           caption: "📱 Escanea este QR para vincular el subbot.",
-        }),
-      onConnected: () =>
-        reply({ text: IS_SUBBOT_ONLINE({prefix: "."}) }),
+        } as Parameters<typeof reply>[0]);
+      },
+      onConnected: async () => {
+        void reply({ text: IS_SUBBOT_ONLINE({ prefix: "." }) });
+      },
     });
   },
 };

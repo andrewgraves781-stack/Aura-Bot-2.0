@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -7,7 +8,7 @@ export default {
   groupOnly: true,
   adminOnly: true,
   botAdmin: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     try {
       const code = await ctx.sock.groupInviteCode(ctx.from);
       return ctx.reply({

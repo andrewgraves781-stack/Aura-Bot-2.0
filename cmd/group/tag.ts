@@ -1,4 +1,10 @@
-import { downloadContentFromMessage } from "@whiskeysockets/baileys";
+import type { CommandContext } from "../../types/index.d.ts";
+import {
+  downloadContentFromMessage,
+  type MediaType,
+  type AnyMessageContent,
+  type GroupParticipant,
+} from "@whiskeysockets/baileys";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -7,14 +13,14 @@ export default {
   description: "Mención invisible para texto y multimedia.",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const quotedContext = ctx.msg?.message?.extendedTextMessage?.contextInfo;
     const quotedMessage = quotedContext?.quotedMessage;
     const participants = Array.isArray(ctx.groupMeta?.participants)
       ? ctx.groupMeta.participants
       : [];
     const mentions = participants
-      .map((participant: any) => participant.id)
+      .map((participant: GroupParticipant) => participant.id)
       .filter(Boolean);
     const customText = ctx.args.join(" ").trim();
     if (quotedMessage) {
@@ -28,14 +34,16 @@ export default {
           "documentMessage",
         ].includes(type)
       ) {
-        const media = quotedMessage[type];
+        const media = quotedMessage[
+          type as keyof typeof quotedMessage
+        ] as import("../../types/index.d.ts").QuotedMediaItem;
         const stream = await downloadContentFromMessage(
-          media,
-          type.replace("Message", "") as any,
+          media as Parameters<typeof downloadContentFromMessage>[0],
+          type.replace("Message", "") as MediaType,
         );
         const chunks: Buffer[] = [];
         for await (const chunk of stream) chunks.push(Buffer.from(chunk));
-        const payload: any = { mentions };
+        const payload: Record<string, unknown> = { mentions };
         const buffer = Buffer.concat(chunks);
         if (type === "imageMessage") {
           payload.image = buffer;
@@ -55,7 +63,7 @@ export default {
           payload.fileName = media.fileName || "documento";
           payload.caption = customText || media.caption || "";
         }
-        return ctx.sock.sendMessage(ctx.from, payload);
+        return ctx.sock.sendMessage(ctx.from, payload as AnyMessageContent);
       }
     }
     const quotedText =

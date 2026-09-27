@@ -9,23 +9,24 @@ export function getPrompt(args: unknown): string {
     : String(args || "").trim();
 }
 
-export function extractText(data: any): string | null {
+export function extractText(data: unknown): string | null {
   if (!data) return null;
   if (typeof data === "string" && data.trim()) return data.trim();
   if (typeof data !== "object") return null;
 
+  const record = data as Record<string, unknown>;
   const fields = ["result", "text", "response", "message", "reply", "answer"];
   for (const field of fields) {
-    if (typeof data[field] === "string" && data[field].trim()) {
-      return data[field].trim();
+    if (typeof record[field] === "string" && (record[field] as string).trim()) {
+      return (record[field] as string).trim();
     }
   }
 
-  if (data.data && typeof data.data === "object") {
-    return extractText(data.data);
+  if (record.data && typeof record.data === "object") {
+    return extractText(record.data);
   }
-  if (typeof data.data === "string" && data.data.trim()) {
-    return data.data.trim();
+  if (typeof record.data === "string" && record.data.trim()) {
+    return record.data.trim();
   }
   return null;
 }

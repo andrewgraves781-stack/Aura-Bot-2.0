@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { getProfile } from "../../core/profileConfig.ts";
 import { db } from "../../dbController/db.ts";
 
@@ -5,7 +6,7 @@ export default {
   name: ["eboard", "auratop"],
   description: "Clasificación global de Aura.",
   category: "profile",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const pageSize = 10;
     const requestedPage = Number.parseInt(String(ctx.args?.[0] || "1"), 10);
     if (!Number.isInteger(requestedPage) || requestedPage < 1) {
@@ -25,7 +26,10 @@ export default {
       })
       .map((user) => ({
         jid: user.jid,
-        username: user.username || (user as any).pushName || "Usuario",
+        username:
+          user.username ||
+          (user as { pushName?: string }).pushName ||
+          "Usuario",
         profile: getProfile(user.jid),
       }))
       .sort(

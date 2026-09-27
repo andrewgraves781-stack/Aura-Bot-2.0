@@ -1,23 +1,14 @@
 import {
   generateWAMessageFromContent,
   prepareWAMessageMedia,
+  type WAMessage,
 } from "@whiskeysockets/baileys";
 import { readFile } from "node:fs/promises";
 import { downloadToCache } from "./downloadUtils.ts";
 import { createLinkPreviewWithoutChannel } from "./LinkPreview.ts";
+import type { DownloadPreviewOptions } from "../types/index.d.ts";
 
-type DownloadPreviewOptions = {
-  sock: any;
-  from: string;
-  msg: any;
-  thumbnail: string;
-  caption: string;
-  link: string;
-  title: string;
-  author?: string;
-  sender?: string;
-  mentions?: string[];
-};
+export type { DownloadPreviewOptions };
 
 export async function sendDownloadPreview({
   sock,
@@ -58,7 +49,7 @@ export async function sendDownloadPreview({
       forwardingScore: 0,
     });
     const previewMessage = generateWAMessageFromContent(from, preview, {
-      quoted: msg,
+      quoted: msg as unknown as WAMessage,
       userJid: sock.user?.id,
     });
     await sock.relayMessage(from, previewMessage.message, {

@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   amountArg,
   economyUser,
@@ -9,7 +10,7 @@ export default {
   name: ["ruleta", "roulette", "rt"],
   category: "economy",
   description: "Juega a la ruleta.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const user = economyUser(ctx);
     const amount = amountArg(ctx.args?.[0]);
     const color = String(ctx.args?.[1] ?? "").toLowerCase();

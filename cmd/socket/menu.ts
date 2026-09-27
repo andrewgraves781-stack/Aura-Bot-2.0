@@ -1,5 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import type { proto } from "@whiskeysockets/baileys";
+import type { CommandPlugin } from "../../types/commands.d.ts";
 import {
   prepareWAMessageMedia,
   generateWAMessageFromContent,
@@ -7,7 +9,10 @@ import {
 import { getPlugins } from "../../core/cmdLoader.ts";
 import { fytBold } from "../../core/socketText.ts";
 
-const mediaCacheMap = new Map<string, any>();
+type CachedMediaMessage =
+  proto.Message.IImageMessage | proto.Message.IVideoMessage;
+
+const mediaCacheMap = new Map<string, CachedMediaMessage>();
 
 function getCommandCategories() {
   const dirs = readdirSync(path.resolve("./cmd"), { withFileTypes: true })
@@ -83,7 +88,7 @@ export default {
       ).values(),
     ].filter((plugin) => plugin && typeof plugin.run === "function");
 
-    const pluginsByCategory = new Map<string, any[]>();
+    const pluginsByCategory = new Map<string, CommandPlugin[]>();
     for (const plugin of plugins) {
       const categoryKey = String(plugin.category || "general").toLowerCase();
       const entry = pluginsByCategory.get(categoryKey) || [];
@@ -150,14 +155,20 @@ export default {
     const customBannerBuffer = customBanner?.base64
       ? Buffer.from(customBanner.base64, "base64")
       : null;
-    if ((customBanner?.path && existsSync(customBanner.path)) || customBannerBuffer?.length) {
-      bannerPath = customBanner.path || `database-banner-${customBanner.base64.slice(0, 32)}`;
+    if (
+      (customBanner?.path && existsSync(customBanner.path)) ||
+      customBannerBuffer?.length
+    ) {
+      bannerPath =
+        customBanner.path ||
+        `database-banner-${customBanner.base64.slice(0, 32)}`;
       isGif = Boolean(
         customBanner.mimetype?.includes("gif") || bannerPath.endsWith(".gif"),
       );
     }
 
-    let imgBanner: any = mediaCacheMap.get(bannerPath);
+    let imgBanner: CachedMediaMessage | undefined =
+      mediaCacheMap.get(bannerPath);
     if (!imgBanner && (customBannerBuffer?.length || existsSync(bannerPath))) {
       try {
         const mediaType = isGif
@@ -176,8 +187,10 @@ export default {
       }
     }
 
-    const getTs = (ts: any) =>
-      typeof ts === "object" ? Number(ts.low || ts) : Number(ts || 0);
+    const getTs = (ts: unknown) =>
+      typeof ts === "object" && ts !== null && "low" in ts
+        ? Number((ts as { low?: number }).low || 0)
+        : Number(ts || 0);
 
     const content = {
       extendedTextMessage: {
@@ -207,7 +220,7 @@ export default {
           },
         },
       },
-    } as any;
+    } as proto.IMessage;
 
     const waMsg = generateWAMessageFromContent(remoteJid, content, {
       userJid: sock.user?.id,

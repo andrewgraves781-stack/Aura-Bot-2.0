@@ -12,6 +12,13 @@ import {
   safeFileName,
 } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
+import type {
+  CommandContext,
+  TikTokDownloadData,
+  TikTokSearchItem,
+  TikTokSearchResponse,
+  TikTokMediaItem,
+} from "../../types/index.d.ts";
 
 const execFileAsync = promisify(execFile);
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
@@ -21,7 +28,7 @@ export default {
   name: ["dtta", "dtka", "docttaudio", "dtkmusic", "doctiktokaudio"],
   category: "download",
   description: "Descarga audio de TikTok como documento.",
-  async run({ args, reply, react }: any) {
+  async run({ args, reply, react }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query) return reply("⚠️ Proporciona una búsqueda o enlace de TikTok.");
     if (!ffmpegPath) return reply("❌ FFmpeg no está disponible.");
@@ -33,21 +40,23 @@ export default {
     try {
       await mkdir(dir, { recursive: true });
       let url = query;
-      let searchResult: any = null;
+      let searchResult: TikTokSearchItem | null = null;
       if (!TIKTOK.test(query)) {
-        const search = await requestJson(
+        const search = await requestJson<TikTokSearchResponse>(
           `${API}/search/tiktok?query=${encodeURIComponent(query)}&key=${DL_CONFIG.alya.API_KEY}`,
         );
-        searchResult = pickSearchResult(search?.data, query);
+        searchResult = pickSearchResult<TikTokSearchItem>(search?.data, query);
         url = searchResult?.url || "";
       }
       if (!url)
         throw new Error("No se encontró ningún resultado para tu búsqueda.");
-      const data = await requestJson(
+      const data = await requestJson<TikTokDownloadData>(
         `${API}/dl/tiktokv2?url=${encodeURIComponent(url)}&key=${DL_CONFIG.alya.API_KEY}`,
         60000,
       );
-      const video = (data?.data || []).find((item: any) => item?.url)?.url;
+      const video = (data?.data || []).find(
+        (item: TikTokMediaItem) => item?.url,
+      )?.url;
       if (!data?.status || !video)
         throw new Error("No se encontró audio descargable.");
       input = await downloadToCache(video, 180000);
@@ -80,10 +89,10 @@ export default {
         fileName: `${safeFileName(title, "tiktok")}.mp3`,
       });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo convertir el audio."}`,
+        text: `❌ Error: ${error instanceof Error ? error.message : "No se pudo convertir el audio."}`,
       });
     } finally {
       await unlink(output).catch(() => undefined);

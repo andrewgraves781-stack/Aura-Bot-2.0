@@ -1,7 +1,17 @@
-import { createCanvas, loadImage } from "@napi-rs/canvas";
+import type { WAMessage } from "@whiskeysockets/baileys";
+import type { CommandContext, ExtendedWASocket } from "../../types/index.d.ts";
+import {
+  createCanvas,
+  loadImage,
+  type SKRSContext2D,
+  type Image,
+} from "@napi-rs/canvas";
 import { fytBold } from "../../core/socketText.ts";
 
-async function getProfilePic(sock: any, jid: string) {
+async function getProfilePic(
+  sock: ExtendedWASocket,
+  jid: string,
+): Promise<Image | null> {
   try {
     const url = await sock.profilePictureUrl(jid, "image");
     const response = await fetch(url);
@@ -13,8 +23,8 @@ async function getProfilePic(sock: any, jid: string) {
 }
 
 function drawCircleAvatar(
-  context: any,
-  image: any,
+  context: SKRSContext2D,
+  image: Image | null,
   x: number,
   y: number,
   size: number,
@@ -39,7 +49,7 @@ function drawCircleAvatar(
 }
 
 function drawHeart(
-  context: any,
+  context: SKRSContext2D,
   centerX: number,
   centerY: number,
   size: number,
@@ -95,7 +105,7 @@ function drawHeart(
 }
 
 function drawProgressBar(
-  context: any,
+  context: SKRSContext2D,
   x: number,
   y: number,
   width: number,
@@ -131,7 +141,7 @@ export default {
   description: "Genera una tarjeta de compatibilidad entre dos usuarios.",
   groupOnly: true,
 
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const messageContext = ctx.msg?.message?.extendedTextMessage?.contextInfo;
     const mentioned = Array.isArray(messageContext?.mentionedJid)
       ? messageContext.mentionedJid
@@ -213,7 +223,7 @@ export default {
     return ctx.sock.sendMessage(
       ctx.from,
       { image: canvas.toBuffer("image/png"), caption, mentions },
-      { quoted: ctx.msg },
+      { quoted: ctx.msg as unknown as WAMessage },
     );
   },
 };

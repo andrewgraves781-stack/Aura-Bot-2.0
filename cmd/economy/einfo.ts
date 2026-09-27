@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   cooldownText,
   formatCoins,
@@ -9,7 +10,7 @@ export default {
   name: ["einfo", "economia"],
   category: "economy",
   description: "Muestra información sobre cómo funciona la economía del bot.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const user = getEconomyUser(ctx.from, ctx.sender);
     const now = Date.now();
     const getRemaining = (key: string, duration: number) => {

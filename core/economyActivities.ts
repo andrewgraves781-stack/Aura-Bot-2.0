@@ -6,6 +6,9 @@ import {
 } from "./economyRuntime.ts";
 import { cooldownText } from "./economyConfig.ts";
 import { economyTexts } from "./economyTexts.ts";
+import type { CommandContext } from "../types/commands.d.ts";
+
+type EconomyTextsKey = keyof typeof economyTexts;
 
 type ActivityOptions = {
   names: string[];
@@ -29,7 +32,7 @@ export function createEconomyActivity(options: ActivityOptions) {
     name: options.names,
     category: "economy",
     description: options.description,
-    async run(ctx: any) {
+    async run(ctx: CommandContext) {
       const user = economyUser(ctx);
       const now = Date.now();
       const last = Number(user[lastKey] ?? 0);
@@ -47,11 +50,17 @@ export function createEconomyActivity(options: ActivityOptions) {
       saveEconomy(ctx, ctx.sender, user);
       addEconomyXp(ctx.sender, xp);
 
-      const configuredTexts = (economyTexts as any)[key];
-      const successTexts = Array.isArray(configuredTexts)
+      const configuredTexts = (
+        economyTexts as Record<
+          string,
+          string[] | { success?: string[]; fail?: string[] }
+        >
+      )[key];
+      const isTextArray = Array.isArray(configuredTexts);
+      const successTexts = isTextArray
         ? configuredTexts
         : configuredTexts?.success;
-      const failTexts = configuredTexts?.fail;
+      const failTexts = isTextArray ? undefined : configuredTexts?.fail;
       const successMessage = successTexts?.length
         ? successTexts
         : options.success;

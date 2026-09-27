@@ -1,3 +1,7 @@
+import type {
+  CommandContext,
+  InteractionApiResponse,
+} from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { request } from "undici";
@@ -6,7 +10,7 @@ export default {
   name: ["anal"],
   description: "Reacción NSFW de anal.",
   category: "nsfw",
-  run: async ({ msg, text, sender, db, reply, react }: any) => {
+  run: async ({ msg, text, sender, db, reply, react }: CommandContext) => {
     await react("🍑");
 
     try {
@@ -40,17 +44,17 @@ export default {
       });
 
       const bodyText = await response.body.text();
-      if (response.statusCode!== 200)
+      if (response.statusCode !== 200)
         throw new Error(`HTTP ${response.statusCode}`);
 
-      let data: any;
+      let data: InteractionApiResponse;
       try {
         data = JSON.parse(bodyText);
       } catch {
         throw new Error("Respuesta no es JSON");
       }
 
-      if (!data?.status ||!data?.result)
+      if (!data?.status || !data?.result)
         throw new Error("API no devolvió resultado válido");
 
       let caption = "";
@@ -75,9 +79,11 @@ export default {
         gifPlayback: true,
         mimetype: "video/mp4",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
-      await reply({ text: `❌ Error: ${error?.message}` });
+      await reply({
+        text: `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
+      });
     }
   },
 };

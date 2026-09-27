@@ -19,6 +19,13 @@ import {
   isWebp,
   isAnimatedWebp,
 } from "../../core/stickerUtils.ts";
+import type {
+  CommandContext,
+  DatabaseUser,
+  StickerPackSearchResponse,
+  StickerPackDetailResponse,
+  StickerPackItem,
+} from "../../types/index.d.ts";
 
 // Configuración de endpoints MMS nativos de WhatsApp (igual que spack.js)
 MEDIA_PATH_MAP["sticker-pack"] = "/mms/document";
@@ -66,9 +73,16 @@ function makeZip(files: Record<string, Buffer>): Buffer {
 }
 
 async function sendStickerPack(
-  sock: any,
+  sock: import("../../types/index.d.ts").ExtendedWASocket,
   remoteJid: string,
-  { name, publisher, description, stickers, cover, quoted }: any,
+  {
+    name,
+    publisher,
+    description,
+    stickers,
+    cover,
+    quoted,
+  }: import("../../types/index.d.ts").SendStickerPackOptions,
 ) {
   if (!stickers.length) throw new Error("Pack vacío.");
   if (stickers.length > 60) throw new Error("Máximo 60 stickers por pack.");
@@ -76,23 +90,25 @@ async function sendStickerPack(
   const packId = generateMessageIDV2();
   const files: Record<string, Buffer> = {};
 
-  const meta = stickers.map((s: any) => {
-    if (s.sticker.length > 1024 * 1024)
-      throw new Error("Un sticker supera 1MB.");
-    const fileName =
-      sha256(s.sticker).toString("base64").replace(/\//g, "-") + ".webp";
-    files[fileName] = s.sticker;
-    return {
-      fileName,
-      mimetype: "image/webp",
-      isAnimated: !!s.isAnimated,
-      emojis: s.emojis?.length ? s.emojis : ["🎭"],
-      accessibilityLabel: "",
-    };
-  });
+  const meta = stickers.map(
+    (s: import("../../types/index.d.ts").PackStickerItem) => {
+      if (s.sticker.length > 1024 * 1024)
+        throw new Error("Un sticker supera 1MB.");
+      const fileName =
+        sha256(s.sticker).toString("base64").replace(/\//g, "-") + ".webp";
+      files[fileName] = s.sticker;
+      return {
+        fileName,
+        mimetype: "image/webp",
+        isAnimated: !!s.isAnimated,
+        emojis: s.emojis?.length ? s.emojis : ["🎭"],
+        accessibilityLabel: "",
+      };
+    },
+  );
 
   const trayIconFileName = `${packId}.webp`;
-  files[trayIconFileName] = cover;
+  files[trayIconFileName] = cover || Buffer.alloc(0);
 
   const zipBuffer = makeZip(files);
 
@@ -124,9 +140,9 @@ async function sendStickerPack(
     },
   };
 
-  const userJid = sock.user?.id || sock.user?.jid;
-  const m = generateWAMessageFromContent(remoteJid, content as any, {
-    quoted,
+  const userJid = sock.user?.id;
+  const m = generateWAMessageFromContent(remoteJid, content as proto.IMessage, {
+    quoted: quoted as unknown as import("@whiskeysockets/baileys").WAMessage,
     userJid,
   });
   await sock.relayMessage(remoteJid, m.message, { messageId: m.key.id });
@@ -148,7 +164,7 @@ export default {
     usedPrefix,
     react,
     reply,
-  }: any) {
+  }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query)
       return reply(
@@ -157,15 +173,15 @@ export default {
     await react("⏳");
     try {
       const api = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
-      const search = await requestJson(
+      const search = await requestJson<StickerPackSearchResponse>(
         `${api}/stickerly/search?query=${encodeURIComponent(query)}&key=${DL_CONFIG.alya.API_KEY}`,
       );
       const packs = (search?.resultados || search?.result || []).filter(
-        (pack: any) => pack?.url && !pack.isPaid,
+        (pack: StickerPackItem) => pack?.url && !pack.isPaid,
       );
       if (!packs.length) throw new Error("No se encontraron packs gratuitos.");
 
-      const detail = await requestJson(
+      const detail = await requestJson<StickerPackDetailResponse>(
         `${api}/stickerly/detail?url=${encodeURIComponent(packs[0].url)}&key=${DL_CONFIG.alya.API_KEY}`,
       );
       const packInfo = detail?.detalles || detail;
@@ -178,7 +194,7 @@ export default {
       });
 
       const results = await Promise.allSettled(
-        rawStickers.map(async (sticker: any) => {
+        rawStickers.map(async (sticker: StickerPackItem) => {
           const url = sticker.imageUrl || sticker.url || sticker.image;
           if (!url) throw new Error("Sticker sin url.");
           const buffer = await readFile(await downloadToCache(url));
@@ -193,13 +209,19 @@ export default {
       );
       const stickers = results
         .filter(
-          (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled",
+          (
+            r,
+          ): r is PromiseFulfilledResult<{
+            sticker: Buffer;
+            isAnimated: boolean;
+            emojis: string[];
+          }> => r.status === "fulfilled",
         )
         .map((r) => r.value);
       if (!stickers.length)
         throw new Error("No se pudo convertir ningún sticker del paquete.");
 
-      const user = db?.getUser?.(sender) || {};
+      const user: Partial<DatabaseUser> = db?.getUser?.(sender) ?? {};
       const packName = String(
         user.stickerPackName || user.data?.stickerPackName || "Aura Reed",
       ).trim();
@@ -231,10 +253,10 @@ export default {
       });
 
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ⚠️ ERROR AL OBTENER PACK\n╰━━━━━━━━━━━━⬣\n\n┃ > ${error?.message || "Intenta nuevamente."}\n╰〔 ⚡ SYSTEM 〕⬣`,
+        text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ⚠️ ERROR AL OBTENER PACK\n╰━━━━━━━━━━━━⬣\n\n┃ > ${error instanceof Error ? error.message : String(error) || "Intenta nuevamente."}\n╰〔 ⚡ SYSTEM 〕⬣`,
       });
     }
   },

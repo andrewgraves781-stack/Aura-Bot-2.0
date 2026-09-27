@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { request } from "undici";
 import { fytBold } from "../../core/socketText.ts";
 import { downloadToCache, safeFileName } from "../../core/downloadUtils.ts";
@@ -35,7 +36,7 @@ export default {
   name: ["md", "mf", "mediafire"],
   category: "download",
   description: "Descarga archivos de MediaFire.",
-  async run({ args, reply, react }: any) {
+  async run({ args, reply, react }: CommandContext) {
     const url = args.join(" ").trim();
     if (!url) return reply("⚠️ Proporciona un enlace de MediaFire.");
     await react("⏳");
@@ -53,10 +54,10 @@ export default {
       await reply({ text: caption });
       await reply({ document: { url: file }, mimetype: mime, fileName: name });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar el archivo."}`,
+        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo descargar el archivo."}`,
       });
     }
   },

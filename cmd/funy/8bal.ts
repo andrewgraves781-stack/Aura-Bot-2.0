@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -5,7 +6,7 @@ export default {
   category: "funy",
   description: "Responde una pregunta estilo bola 8.",
 
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const question = ctx.args.join(" ").trim();
     if (!question) {
       const usage = `${ctx.usedPrefix || "."}8bal <pregunta>`;

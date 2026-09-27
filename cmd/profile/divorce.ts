@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   getProfile,
   setPendingProfileAction,
@@ -7,7 +8,7 @@ export default {
   name: ["divorce", "divorcio"],
   description: "Termina tu matrimonio.",
   category: "profile",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const spouse = getProfile(ctx.sender).marriedTo;
     if (!spouse) return ctx.reply("❌ No tienes pareja registrada.");
     setPendingProfileAction({ kind: "divorce", from: ctx.sender, to: spouse });

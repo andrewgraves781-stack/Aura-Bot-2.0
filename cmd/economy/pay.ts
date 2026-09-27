@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   amountArg,
   economyTarget,
@@ -11,7 +12,7 @@ export default {
   category: "economy",
   description: "Transfiere monedas a otro usuario del grupo.",
   groupOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const target = await economyTarget(ctx);
     const amount = amountArg(ctx.args?.[0]);
     const sender = economyUser(ctx);

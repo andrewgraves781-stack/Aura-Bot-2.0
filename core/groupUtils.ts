@@ -1,18 +1,21 @@
+import type { CommandContext } from "../types/index.d.ts";
+import type { DatabaseGroup } from "../types/index.d.ts";
+
 export function cleanJid(value: unknown): string {
   return String(value || "")
     .trim()
     .split(":")[0];
 }
 
-export function getTargetJids(ctx: any): string[] {
+export function getTargetJids(ctx: CommandContext): string[] {
   const context = Object.values(ctx.msg?.message ?? {})
-    .map((value: any) => value?.contextInfo)
-    .find(Boolean) as any;
+    .map((value) => (value as Record<string, unknown>)?.contextInfo)
+    .find(Boolean) as Record<string, unknown> | undefined;
   const mentioned = Array.isArray(context?.mentionedJid)
-    ? context.mentionedJid
+    ? (context.mentionedJid as string[])
     : [];
-  const quoted = context?.participant ? [context.participant] : [];
-  return [...new Set([...mentioned, ...quoted].filter(Boolean))] as string[];
+  const quoted = context?.participant ? [String(context.participant)] : [];
+  return [...new Set([...mentioned, ...quoted].filter(Boolean))];
 }
 
 export function groupStatus(value: unknown): string {
@@ -28,11 +31,14 @@ export function parseToggle(value: unknown): boolean | null {
   return null;
 }
 
-export function getGroupData(ctx: any): any {
+export function getGroupData(ctx: CommandContext): DatabaseGroup {
   return ctx.db.getGroup(ctx.from);
 }
 
-export function saveGroupData(ctx: any, data: Record<string, any>): any {
+export function saveGroupData(
+  ctx: CommandContext,
+  data: Record<string, unknown>,
+): DatabaseGroup {
   ctx.db.setGroup(ctx.from, data);
   return ctx.db.getGroup(ctx.from);
 }

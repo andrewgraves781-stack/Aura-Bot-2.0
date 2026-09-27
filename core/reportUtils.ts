@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { fytBold } from "./socketText.ts";
 import { getActiveSubBots } from "./subbotManager.ts";
+import type { proto } from "@whiskeysockets/baileys";
+import type { ExtendedWASocket } from "../types/index.d.ts";
 
 export const REPORT_GROUP_JID = "120363410372126705@g.us";
 const REPORT_MARKER = /\[AURA_REPORT:([A-Za-z0-9_-]+)\]/;
@@ -11,7 +13,7 @@ export type ReportData = {
   originName?: string;
   senderJid: string;
   botSession: string;
-  sourceMessage?: { key: any; message: any };
+  sourceMessage?: { key: proto.IMessageKey; message: proto.IMessage };
 };
 
 export function createReportId(): string {
@@ -35,8 +37,9 @@ export function decodeReportData(text: unknown): ReportData | null {
   }
 }
 
-export function getQuotedText(message: any): string {
-  const quoted = message?.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+export function getQuotedText(message: proto.IWebMessageInfo): string {
+  const quoted =
+    message?.message?.extendedTextMessage?.contextInfo?.quotedMessage;
   return String(
     quoted?.conversation ||
       quoted?.extendedTextMessage?.text ||
@@ -68,23 +71,34 @@ export function replyCaption(text: string): string {
   return `╭〔 💬 ${fytBold("RESPUESTA DE SOPORTE")} 〕⬣\n\n┃ > ${text.replace(/\n/g, "\n")}\n\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
 }
 
-export function getSocketCandidates(current: any): any[] {
-  const candidates = [current, globalThis.mainSocket, ...getActiveSubBots()];
+export function getSocketCandidates(
+  current: ExtendedWASocket,
+): ExtendedWASocket[] {
+  const candidates = [
+    current,
+    globalThis.mainSocket,
+    ...getActiveSubBots(),
+  ] as ExtendedWASocket[];
   return candidates.filter(
-    (socket, index) => socket?.sendMessage && candidates.indexOf(socket) === index,
+    (socket, index) =>
+      socket?.sendMessage && candidates.indexOf(socket) === index,
   );
 }
 
 export async function sendWithAvailableBot(
-  sockets: any[],
+  sockets: ExtendedWASocket[],
   jid: string,
-  content: any,
-  options?: any,
-): Promise<any> {
+  content: Record<string, unknown>,
+  options?: Record<string, unknown>,
+): Promise<unknown> {
   let lastError: unknown;
   for (const socket of sockets) {
     try {
-      return await socket.sendMessage(jid, content, options);
+      return await socket.sendMessage(
+        jid,
+        content as Parameters<typeof socket.sendMessage>[1],
+        options,
+      );
     } catch (error) {
       lastError = error;
     }

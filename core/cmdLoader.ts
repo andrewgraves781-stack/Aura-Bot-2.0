@@ -3,8 +3,9 @@ import type { Dirent } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { logInfo, errorLog } from "./logger.ts";
+import type { CommandPlugin } from "../types/index.d.ts";
 
-const plugins = new Map<string, any>();
+const plugins = new Map<string, CommandPlugin>();
 const PLUGINS_DIR = path.resolve("./cmd");
 const watchTimers = new Map<string, NodeJS.Timeout>();
 
@@ -13,17 +14,20 @@ function toFileName(value: string | Buffer | undefined | null): string {
   return typeof value === "string" ? value : value.toString();
 }
 
-function normalizePlugin(plugin: any) {
+function normalizePlugin(plugin: unknown): CommandPlugin | null {
   if (!plugin || typeof plugin !== "object") return null;
 
-  if (!plugin.name) return null;
-  if (!plugin.run && typeof plugin.execute === "function") {
-    plugin.run = plugin.execute.bind(plugin);
+  const candidate = plugin as Record<string, unknown>;
+  if (!candidate.name) return null;
+  if (!candidate.run && typeof candidate.execute === "function") {
+    candidate.run = (candidate.execute as (...args: unknown[]) => unknown).bind(
+      candidate,
+    );
   }
 
-  if (typeof plugin.run !== "function") return null;
+  if (typeof candidate.run !== "function") return null;
 
-  return plugin;
+  return candidate as unknown as CommandPlugin;
 }
 
 export async function loadPlugins() {
@@ -84,10 +88,9 @@ async function loadPlugin(filePath: string) {
         plugins.set(name.toLowerCase(), plugin);
       }
     }
-  } catch (error: any) {
-    errorLog(
-      `Error cargando plugin ${filePath}: ${error?.message ?? String(error)}`,
-    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    errorLog(`Error cargando plugin ${filePath}: ${message}`);
   }
 }
 
@@ -131,11 +134,12 @@ export async function watchPlugins() {
         watchTimers.set(fullPath, timer);
       }
     })();
-  } catch (error) {
-    errorLog(`Error en el observador de plugins: ${error}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    errorLog(`Error en el observador de plugins: ${message}`);
   }
 }
 
-export function getPlugins() {
+export function getPlugins(): Map<string, CommandPlugin> {
   return plugins;
 }

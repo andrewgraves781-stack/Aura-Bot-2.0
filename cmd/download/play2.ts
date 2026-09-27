@@ -6,6 +6,11 @@ import {
 } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { sendDownloadPreview } from "../../core/downloadPreview.ts";
+import type {
+  CommandContext,
+  YouTubeVideoData,
+  YouTubeSearchResponse,
+} from "../../types/index.d.ts";
 
 const API = "https://api.lempi.lat";
 const KEY = "OBOE-AERETHIX";
@@ -17,26 +22,26 @@ function videoId(value: string): string | null {
 }
 
 async function searchVideo(query: string): Promise<string> {
-  const data = await requestJson(
+  const data = await requestJson<YouTubeSearchResponse>(
     `${DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "")}/search/yt?query=${encodeURIComponent(query)}&key=${DL_CONFIG.alya.API_KEY}`,
   );
   if (!data?.status || !data.result?.[0]?.url)
     throw new Error("No se encontró ningún video.");
-  return data.result[0].url;
+  return data.result[0].url as string;
 }
 
 export default {
   name: ["ytmp4", "video", "playvideo", "mp4", "ytv", "play2"],
   category: "download",
   description: "Busca y descarga video de YouTube.",
-  async run({ args, reply, react, sock, from, msg, sender }: any) {
+  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query) return reply("⚠️ Proporciona el nombre o enlace de un video.");
     await react("⏳");
     try {
       const id = videoId(query);
       const url = id ? `https://youtu.be/${id}` : await searchVideo(query);
-      const data = await requestJson(
+      const data = await requestJson<YouTubeVideoData>(
         `${API}/dl/ytv?url=${encodeURIComponent(url)}&quality=1080&apikey=${KEY}`,
         60000,
       );
@@ -65,10 +70,10 @@ export default {
         fileName: `${safeFileName(title, "youtube")}.mp4`,
       });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar el video."}`,
+        text: `❌ Error: ${error instanceof Error ? error.message : "No se pudo descargar el video."}`,
       });
     }
   },

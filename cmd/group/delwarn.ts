@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -6,7 +7,7 @@ export default {
   description: "Quita una advertencia.",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const context = ctx.msg?.message?.extendedTextMessage?.contextInfo;
     const target = context?.mentionedJid?.[0] || context?.participant;
     if (!target)

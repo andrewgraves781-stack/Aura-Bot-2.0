@@ -1,18 +1,10 @@
 import { connectToWhatsApp, type ConnectionOptions } from "./conection.ts";
 import { db } from "../dbController/db.ts";
+import type { ExtendedWASocket, SubBotLinkRequest } from "../types/index.d.ts";
 
-type LinkRequest = {
-  requester: string;
-  method: "qr" | "code";
-  phoneNumber?: string;
-  onQr?: (qr: string) => Promise<void> | void;
-  onPairingCode?: (code: string) => Promise<void> | void;
-  onConnected?: () => Promise<void> | void;
-  onPairingError?: (error: Error) => Promise<void> | void;
-  onPairingExpired?: () => Promise<void> | void;
-};
+export type LinkRequest = SubBotLinkRequest;
 
-const activeSubBots = new Map<string, any>();
+const activeSubBots = new Map<string, ExtendedWASocket>();
 
 function normalizePhone(value: unknown): string {
   return String(value || "").replace(/\D/g, "");
@@ -22,7 +14,7 @@ function sessionNameFor(requester: string): string {
   return `sub-${String(requester).split("@")[0].replace(/\D/g, "") || "bot"}`;
 }
 
-export function getActiveSubBots() {
+export function getActiveSubBots(): ExtendedWASocket[] {
   return [...activeSubBots.values()];
 }
 
@@ -81,13 +73,14 @@ export async function requestSubBotLink(request: LinkRequest) {
 }
 
 export async function startSavedSubBots() {
-  for (const bot of db.getAllBots() as Array<any>) {
+  for (const bot of db.getAllBots()) {
     if (String(bot.jid || "").startsWith("sub-")) {
       db.deleteBot(bot.jid);
       continue;
     }
 
-    const sessionName = bot.data?.sessionName;
+    const sessionName = (bot.data as Record<string, unknown> | undefined)
+      ?.sessionName as string | undefined;
     if (bot.isMain || !sessionName) continue;
     if (activeSubBots.has(sessionName)) continue;
 

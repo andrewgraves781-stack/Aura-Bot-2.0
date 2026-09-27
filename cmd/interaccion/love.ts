@@ -1,3 +1,7 @@
+import type {
+  CommandContext,
+  InteractionApiResponse,
+} from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { request } from "undici";
@@ -7,7 +11,16 @@ export default {
   description: "Envía una reacción de amor.",
   category: "interaction",
 
-  async run({ args, reply, react, msg, from, sender, text, db }: any) {
+  async run({
+    args,
+    reply,
+    react,
+    msg,
+    from,
+    sender,
+    text,
+    db,
+  }: CommandContext) {
     await react("❤️");
 
     try {
@@ -44,7 +57,7 @@ export default {
       if (response.statusCode !== 200)
         throw new Error(`HTTP ${response.statusCode}`);
 
-      let data: any;
+      let data: InteractionApiResponse;
       try {
         data = JSON.parse(bodyText);
       } catch {
@@ -76,9 +89,11 @@ export default {
         gifPlayback: true,
         mimetype: "video/mp4",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
-      await reply({ text: `❌ Error: ${error?.message}` });
+      await reply({
+        text: `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
+      });
     }
   },
 };

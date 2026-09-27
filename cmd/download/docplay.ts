@@ -2,6 +2,11 @@ import { fytBold } from "../../core/socketText.ts";
 import { requestJson, safeFileName } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { sendDownloadPreview } from "../../core/downloadPreview.ts";
+import type {
+  CommandContext,
+  YouTubeSearchResponse,
+  YouTubeMp3Response,
+} from "../../types/index.d.ts";
 
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
 const YT_ID =
@@ -19,7 +24,7 @@ export default {
   ],
   category: "download",
   description: "Descarga audio de YouTube como documento.",
-  async run({ args, reply, react, sock, from, msg, sender }: any) {
+  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query)
       return reply("⚠️ Proporciona una búsqueda o enlace de YouTube.");
@@ -27,13 +32,13 @@ export default {
     try {
       let url = query;
       if (!YT_ID.test(query)) {
-        const search = await requestJson(
+        const search = await requestJson<YouTubeSearchResponse>(
           `${API}/search/yt?query=${encodeURIComponent(query)}&key=${DL_CONFIG.alya.API_KEY}`,
         );
         url = search?.result?.[0]?.url || "";
       } else url = `https://youtu.be/${query.match(YT_ID)?.[1]}`;
       if (!url) throw new Error("No se encontró ningún video.");
-      const data = await requestJson(
+      const data = await requestJson<YouTubeMp3Response>(
         `${API}/dl/ytmp3v2?url=${encodeURIComponent(url)}&key=${DL_CONFIG.alya.API_KEY}`,
       );
       if (!data?.status || !data.data?.dl)
@@ -65,10 +70,14 @@ export default {
         fileName: `${safeFileName(title, "youtube")}.mp3`,
       });
       await react("✅");
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo descargar el audio.";
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar el audio."}`,
+        text: `❌ Error: ${message}`,
       });
     }
   },

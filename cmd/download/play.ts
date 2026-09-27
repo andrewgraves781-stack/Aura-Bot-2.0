@@ -1,8 +1,16 @@
+import type {
+  CommandContext,
+  YouTubeSearchItem,
+  YouTubeSearchResponse,
+  YouTubeMp3Data,
+  YouTubeMp3Response,
+} from "../../types/index.d.ts";
 import { request } from "undici";
 import { readFile } from "node:fs/promises";
 import {
   generateWAMessageFromContent,
   prepareWAMessageMedia,
+  type WAMessage,
 } from "@whiskeysockets/baileys";
 import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
@@ -54,7 +62,7 @@ function isYouTubeUrl(value: string): boolean {
   );
 }
 
-async function queryYouTubeAudio(query: string): Promise<any> {
+async function queryYouTubeAudio(query: string): Promise<YouTubeSearchItem> {
   const queryUrl = `${BASE_URL}/search/yt?query=${encodeURIComponent(query)}&key=${API_KEY}`;
 
   const response = await request(queryUrl, {
@@ -66,7 +74,7 @@ async function queryYouTubeAudio(query: string): Promise<any> {
     throw new Error(`La búsqueda respondió HTTP ${response.statusCode}.`);
   }
 
-  const data: any = await response.body.json();
+  const data = (await response.body.json()) as YouTubeSearchResponse;
   if (
     data?.status !== true ||
     !Array.isArray(data.result) ||
@@ -78,7 +86,7 @@ async function queryYouTubeAudio(query: string): Promise<any> {
   return data.result[0];
 }
 
-async function downloadYouTubeAudio(url: string): Promise<any> {
+async function downloadYouTubeAudio(url: string): Promise<YouTubeMp3Data> {
   const downloadUrl = `${BASE_URL}/dl/ytmp3v2?url=${encodeURIComponent(url)}&key=${API_KEY}`;
   const response = await request(downloadUrl, {
     signal: AbortSignal.timeout(30000),
@@ -89,7 +97,7 @@ async function downloadYouTubeAudio(url: string): Promise<any> {
     throw new Error(`La descarga respondió HTTP ${response.statusCode}.`);
   }
 
-  const data: any = await response.body.json();
+  const data = (await response.body.json()) as YouTubeMp3Response;
   if (data?.status !== true || !data.data?.dl) {
     throw new Error("La API no devolvió un audio descargable.");
   }
@@ -97,7 +105,7 @@ async function downloadYouTubeAudio(url: string): Promise<any> {
   return data.data;
 }
 
-function fomatViewers(valor) {
+function fomatViewers(valor: unknown): string {
   if (valor === null || valor === undefined) return "0";
 
   const raw = String(valor).trim();
@@ -128,7 +136,7 @@ export default {
   name: ["play", "ytmp3", "ytaudio", "playaudio", "playmp3", "ytmusic", "yta"],
   description: "Busca y descarga audio de YouTube.",
   category: "download",
-  async run({ args, reply, react, sock, from, msg, sender }: any) {
+  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
     const query = args.join(" ").trim();
     if (!query)
       return reply(
@@ -137,12 +145,12 @@ export default {
 
     await react("🎵");
     try {
-      let result: any = {};
+      let result: YouTubeSearchItem = {};
       let finalUrl = query;
 
       if (!isYouTubeUrl(query)) {
         result = await queryYouTubeAudio(query);
-        finalUrl = result.url;
+        finalUrl = result.url || query;
       } else {
         const videoId = getYouTubeVideoId(query);
         if (!videoId) throw new Error("URL de YouTube no válida.");
@@ -172,9 +180,11 @@ export default {
       caption += `┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando audio...\n`;
       caption += `╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
 
-      const thumbnail = videoId
-        ? audio.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
-        : audio.thumbnail || result.banner;
+      const thumbnail = String(
+        videoId
+          ? audio.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+          : audio.thumbnail || result.banner || "",
+      );
       if (thumbnail) {
         const thumbnailBuffer = await readFile(
           await downloadToCache(thumbnail, 30000),
@@ -196,11 +206,10 @@ export default {
           isForwarded: false,
           forwardingScore: 0,
         });
-        const previewMessage = generateWAMessageFromContent(
-          from,
-          preview,
-          { quoted: msg, userJid: sock.user?.id },
-        );
+        const previewMessage = generateWAMessageFromContent(from, preview, {
+          quoted: msg as unknown as WAMessage,
+          userJid: sock.user?.id,
+        });
         await sock.relayMessage(from, previewMessage.message, {
           messageId: previewMessage.key.id,
         });
@@ -214,10 +223,10 @@ export default {
         mimetype: "audio/mpeg",
         fileName: `${title.replace(/[<>:"/\\|?*]/g, "").slice(0, 100) || "youtube"}.mp3`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error?.message || "No se pudo descargar el audio."}`,
+        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo descargar el audio."}`,
       });
     }
   },

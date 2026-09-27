@@ -1,4 +1,8 @@
-import { jidNormalizedUser } from "@whiskeysockets/baileys";
+import type { CommandContext } from "../../types/index.d.ts";
+import {
+  jidNormalizedUser,
+  type GroupParticipant,
+} from "@whiskeysockets/baileys";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -7,16 +11,16 @@ export default {
   description: "Menciona a todos los integrantes.",
   groupOnly: true,
   adminOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const participants = Array.isArray(ctx.groupMeta?.participants)
       ? ctx.groupMeta.participants
       : [];
     const memberJids = Array.from(
       new Set<string>(
         participants
-          .map((participant: any) => participant?.id)
+          .map((participant: GroupParticipant) => participant?.id)
           .filter(Boolean)
-          .map((jid: string) => String(jidNormalizedUser(jid))) as string[],
+          .map((jid: string) => String(jidNormalizedUser(jid))),
       ),
     );
     if (!memberJids.length)

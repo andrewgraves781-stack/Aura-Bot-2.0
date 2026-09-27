@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { readFile } from "node:fs/promises";
@@ -13,7 +14,15 @@ export default {
   name: ["emojivid", "emoji", "emoji-video", "emojivideo"],
   category: "sticker",
   description: "Genera un sticker animado a partir de un emoji.",
-  async run({ args, db, sender, msg, usedPrefix, react, reply }: any) {
+  async run({
+    args,
+    db,
+    sender,
+    msg,
+    usedPrefix,
+    react,
+    reply,
+  }: CommandContext) {
     const emoji = extractEmojis(args.join(" ").trim())[0];
     if (!emoji)
       return reply(`⚠️ Envía un emoji. Ejemplo: ${usedPrefix}emojivid ❤️`);
@@ -30,10 +39,10 @@ export default {
       );
       await react("✅");
       return reply({ sticker: finalSticker, mimetype: "image/webp" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ⚠️ ERROR AL CREAR STICKER\n╰━━━━━━━━━━━━⬣\n\n┃ > ${error?.message || "Intenta nuevamente."}\n╰〔 ⚡ SYSTEM 〕⬣`,
+        text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ⚠️ ERROR AL CREAR STICKER\n╰━━━━━━━━━━━━⬣\n\n┃ > ${error instanceof Error ? error.message : String(error) || "Intenta nuevamente."}\n╰〔 ⚡ SYSTEM 〕⬣`,
       });
     }
   },

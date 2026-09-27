@@ -1,6 +1,28 @@
 import DataBase from "better-sqlite3";
 import { mkdirSync, existsSync } from "fs";
 import "../config.ts";
+import type {
+  IDatabase,
+  DatabaseUser,
+  DatabaseGroup,
+  DatabaseBot,
+  UserRole,
+  TopMsgUser,
+  UserDbRow,
+  GroupDbRow,
+  BotDbRow,
+} from "../types/index.d.ts";
+
+export type {
+  DatabaseUser,
+  DatabaseGroup,
+  DatabaseBot,
+  UserRole,
+  IDatabase,
+  UserDbRow,
+  GroupDbRow,
+  BotDbRow,
+};
 
 const DATA_BASE_DIR = globalThis.DATA_BASE_DIR;
 if (!existsSync(DATA_BASE_DIR)) {
@@ -86,7 +108,6 @@ for (const [table, column, definition] of [
 }
 
 const hierarchy = ["user", "premium", "mod", "coowner", "owner"] as const;
-type UserRole = (typeof hierarchy)[number];
 
 const stmts = {
   getUser: db_instance.prepare("SELECT * FROM users WHERE jid = ?"),
@@ -134,7 +155,7 @@ function normalizeJid(input: string) {
     .replace(/:.*/, "");
 }
 
-function safeJson<T = Record<string, any>>(
+function safeJson<T = Record<string, unknown>>(
   value: string | null | undefined,
 ): T {
   if (!value) return {} as T;
@@ -168,7 +189,7 @@ function getCurrentMessageWeek(date = new Date()): string {
   return `${current.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-function getUserRow(input: string, lid?: string | null) {
+function getUserRow(input: string, lid?: string | null): UserDbRow | undefined {
   const rawInput = String(input || "").trim();
   const key = normalizeJid(rawInput);
   const candidates = [rawInput, key, key ? `${key}@s.whatsapp.net` : ""].filter(
@@ -184,16 +205,16 @@ function getUserRow(input: string, lid?: string | null) {
 
   return db_instance
     .prepare(`SELECT * FROM users WHERE ${conditions.join(" OR ")} LIMIT 1`)
-    .get(...values) as any | undefined;
+    .get(...values) as UserDbRow | undefined;
 }
 
-function getUser(input: string) {
+function getUser(input: string): DatabaseUser {
   const rawInput = String(input || "").trim();
   const key = normalizeJid(rawInput);
   const row = getUserRow(rawInput);
 
   if (!row) {
-    const defaultUser = {
+    const defaultUser: DatabaseUser = {
       jid: rawInput.endsWith("@lid") ? null : `${key}@s.whatsapp.net`,
       lid: rawInput.endsWith("@lid") ? rawInput : null,
       username: null,
@@ -216,29 +237,32 @@ function getUser(input: string) {
     return defaultUser;
   }
 
-  const jsonData = safeJson<Record<string, any>>(row.data);
+  const jsonData = safeJson<Record<string, unknown>>(
+    row.data as string | undefined,
+  );
   return {
     ...jsonData,
-    jid: row.jid !== undefined ? row.jid : (jsonData.jid ?? key),
-    lid:
-      row.lid ?? jsonData.lid ?? (rawInput.endsWith("@lid") ? rawInput : null),
-    username: row.username ?? jsonData.username ?? null,
-    phone_number:
-      row.phone_number !== undefined
-        ? row.phone_number
-        : (jsonData.phone_number ?? key),
-    role: row.role ?? jsonData.role ?? "user",
+    jid: (row.jid !== undefined ? row.jid : (jsonData.jid ?? key)) as
+      string | null,
+    lid: (row.lid ??
+      jsonData.lid ??
+      (rawInput.endsWith("@lid") ? rawInput : null)) as string | null,
+    username: (row.username ?? jsonData.username ?? null) as string | null,
+    phone_number: (row.phone_number !== undefined
+      ? row.phone_number
+      : (jsonData.phone_number ?? key)) as string | null,
+    role: (row.role ?? jsonData.role ?? "user") as string,
     is_banned: Number(row.is_banned ?? jsonData.is_banned ?? 0),
     data: jsonData,
   };
 }
 
-function getGroup(jid: string) {
+function getGroup(jid: string): DatabaseGroup {
   const key = normalizeJid(jid);
-  const row = stmts.getGroup.get(key) as any | undefined;
+  const row = stmts.getGroup.get(key) as GroupDbRow | undefined;
 
   if (!row) {
-    const defaultGroup = {
+    const defaultGroup: DatabaseGroup = {
       group_id: key,
       group_name: null,
       antilink: 0,
@@ -281,9 +305,11 @@ function getGroup(jid: string) {
     return defaultGroup;
   }
 
-  const jsonData = safeJson<Record<string, any>>(row.data);
-  const storedTopMsgUsers = safeJson<any[]>(
-    row.topMsgUsers ?? jsonData.topMsgUsers,
+  const jsonData = safeJson<Record<string, unknown>>(
+    row.data as string | undefined,
+  );
+  const storedTopMsgUsers = safeJson<TopMsgUser[]>(
+    (row.topMsgUsers ?? jsonData.topMsgUsers) as string | undefined,
   );
   const currentWeek = getCurrentMessageWeek();
   const hasPreviousWeek =
@@ -297,37 +323,43 @@ function getGroup(jid: string) {
 
   return {
     ...jsonData,
-    group_id: row.group_id ?? jsonData.group_id ?? key,
-    group_name: row.group_name ?? jsonData.group_name ?? null,
+    group_id: (row.group_id ?? jsonData.group_id ?? key) as string,
+    group_name: (row.group_name ?? jsonData.group_name ?? null) as
+      string | null,
     antilink: Number(row.antilink ?? jsonData.antilink ?? 0),
     antiCalls: Number(row.antiCalls ?? jsonData.antiCalls ?? 0),
     antiToxic: Number(row.antiToxic ?? jsonData.antiToxic ?? 0),
     antiSpam: Number(row.antiSpam ?? jsonData.antiSpam ?? 0),
     antiStatus: Number(row.antiStatus ?? jsonData.antiStatus ?? 0),
     onlyAdmin: Number(row.onlyAdmin ?? jsonData.onlyAdmin ?? 0),
-    prefix: row.prefix ?? jsonData.prefix ?? null,
+    prefix: (row.prefix ?? jsonData.prefix ?? null) as string | null,
     self: Number(row.self ?? jsonData.self ?? 0),
     catBlocked: safeJsonArray(
-      row.catBlocked ?? jsonData.catBlocked ?? '["nsfw"]',
+      (row.catBlocked ?? jsonData.catBlocked ?? '["nsfw"]') as
+        string | undefined,
     ),
     privateMode: Boolean(row.privateMode ?? jsonData.privateMode ?? false),
     adminMode: Boolean(row.adminMode ?? jsonData.adminMode ?? false),
-    primaryBot: row.primaryBot ?? jsonData.primaryBot ?? null,
+    primaryBot: (row.primaryBot ?? jsonData.primaryBot ?? null) as
+      string | null,
     welcome: Boolean(row.welcome ?? jsonData.welcome ?? false),
     goodbye: Boolean(row.goodbye ?? jsonData.goodbye ?? false),
-    welcomeMessage: row.welcomeMessage ?? jsonData.welcomeMessage ?? null,
-    goodbyeMessage: row.goodbyeMessage ?? jsonData.goodbyeMessage ?? null,
+    welcomeMessage: (row.welcomeMessage ?? jsonData.welcomeMessage ?? null) as
+      string | null,
+    goodbyeMessage: (row.goodbyeMessage ?? jsonData.goodbyeMessage ?? null) as
+      string | null,
     topMsgUsers: hasPreviousWeek ? [] : storedTopMsgUsers,
     data: jsonData,
   };
 }
 
-function getBot(jid: string) {
+function getBot(jid: string): DatabaseBot {
   const key = normalizeJid(jid);
-  const row = stmts.getBot.get(key) as any | undefined;
+  const row = stmts.getBot.get(key) as BotDbRow | undefined;
 
   if (!row) {
-    const defaultBot = {
+    const defaultBot: DatabaseBot = {
+      jid: key,
       bot_id: key,
       bot_name: null,
       phone_number: null,
@@ -357,28 +389,37 @@ function getBot(jid: string) {
     return defaultBot;
   }
 
-  const jsonData = safeJson<Record<string, any>>(row.data);
+  const jsonData = safeJson<Record<string, unknown>>(
+    row.data as string | undefined,
+  );
   return {
+    jid: (row.jid ?? key) as string,
     ...jsonData,
-    bot_id: row.bot_id ?? jsonData.bot_id ?? key,
-    bot_name: row.bot_name ?? jsonData.bot_name ?? null,
-    phone_number: row.phone_number ?? jsonData.phone_number ?? null,
-    lid: row.lid ?? jsonData.lid ?? null,
-    groups: safeJsonArray(row.groups ?? jsonData.groups),
+    bot_id: (row.bot_id ?? jsonData.bot_id ?? key) as string,
+    bot_name: (row.bot_name ?? jsonData.bot_name ?? null) as string | null,
+    phone_number: (row.phone_number ?? jsonData.phone_number ?? null) as
+      string | null,
+    lid: (row.lid ?? jsonData.lid ?? null) as string | null,
+    groups: safeJsonArray(
+      (row.groups ?? jsonData.groups) as string | undefined,
+    ),
     isMain: Number(row.isMain ?? jsonData.isMain ?? 0),
-    status: row.status ?? jsonData.status ?? "offline",
-    modPrefix: row.modPrefix ?? jsonData.modPrefix ?? null,
+    status: (row.status ?? jsonData.status ?? "offline") as string,
+    modPrefix: (row.modPrefix ?? jsonData.modPrefix ?? null) as string | null,
     modSelf: Number(row.modSelf ?? jsonData.modSelf ?? 0),
     data: jsonData,
   };
 }
 
-export const db = {
+export const db: IDatabase = {
   getUser,
   getGroup,
   getBot,
 
-  setUser(jid: string, dataObject: Record<string, any>) {
+  setUser(
+    jid: string,
+    dataObject: Partial<DatabaseUser> & Record<string, unknown>,
+  ) {
     const key = normalizeJid(jid);
     const currentData = getUser(jid);
     const merged = { ...currentData, ...dataObject };
@@ -440,7 +481,10 @@ export const db = {
     }
   },
 
-  setGroup(jid: string, dataObject: Record<string, any>) {
+  setGroup(
+    jid: string,
+    dataObject: Partial<DatabaseGroup> & Record<string, unknown>,
+  ) {
     const key = normalizeJid(jid);
     const currentData = getGroup(key);
     const merged = { ...currentData, ...dataObject };
@@ -451,7 +495,7 @@ export const db = {
 
     delete payload.data;
 
-    const row = stmts.getGroup.get(key) as any | undefined;
+    const row = stmts.getGroup.get(key) as Record<string, unknown> | undefined;
     if (!row) {
       stmts.insertGroup.run(
         key,
@@ -490,19 +534,24 @@ export const db = {
       JSON.stringify(
         Array.isArray(merged.topMsgUsers)
           ? merged.topMsgUsers
-          : safeJson<Record<string, any>[]>(row.topMsgUsers),
+          : safeJson<Record<string, unknown>[]>(
+              row.topMsgUsers as string | undefined,
+            ),
       ),
       JSON.stringify(
         Array.isArray(merged.catBlocked)
           ? merged.catBlocked
-          : safeJsonArray(row.catBlocked ?? '["nsfw"]'),
+          : safeJsonArray((row.catBlocked as string | undefined) ?? '["nsfw"]'),
       ),
       JSON.stringify(payload),
       key,
     );
   },
 
-  setBot(jid: string, dataObject: Record<string, any>) {
+  setBot(
+    jid: string,
+    dataObject: Partial<DatabaseBot> & Record<string, unknown>,
+  ) {
     const key = normalizeJid(jid);
     const currentData = getBot(key);
     const merged = { ...currentData, ...dataObject };
@@ -513,7 +562,7 @@ export const db = {
 
     delete payload.data;
 
-    const row = stmts.getBot.get(key) as any | undefined;
+    const row = stmts.getBot.get(key) as BotDbRow | undefined;
     if (!row) {
       stmts.insertBot.run(
         key,
@@ -603,38 +652,47 @@ export const db = {
     stmts.deleteBot.run(normalizeJid(jid));
   },
 
-  getAllUsers() {
-    const rows = stmts.getAllUsers.all() as Array<Record<string, any>>;
+  getAllUsers(): DatabaseUser[] {
+    const rows = stmts.getAllUsers.all() as Array<Record<string, unknown>>;
     return rows.map((row) => {
-      const jsonData = safeJson<Record<string, any>>(row.data);
+      const jsonData = safeJson<Record<string, unknown>>(
+        row.data as string | undefined,
+      );
       return {
-        jid: row.jid ?? jsonData.jid ?? null,
+        jid: (row.jid ?? jsonData.jid ?? null) as string | null,
         ...jsonData,
-        lid: row.lid ?? jsonData.lid ?? null,
-        username: row.username ?? jsonData.username ?? null,
-        phone_number: row.phone_number ?? jsonData.phone_number ?? row.jid,
-        role: row.role ?? jsonData.role ?? "user",
+        lid: (row.lid ?? jsonData.lid ?? null) as string | null,
+        username: (row.username ?? jsonData.username ?? null) as string | null,
+        phone_number: (row.phone_number ?? jsonData.phone_number ?? row.jid) as
+          string | null,
+        role: (row.role ?? jsonData.role ?? "user") as string,
         is_banned: Number(row.is_banned ?? jsonData.is_banned ?? 0),
       };
     });
   },
 
-  getAllBots() {
-    const rows = stmts.getAllBots.all() as Array<Record<string, any>>;
+  getAllBots(): DatabaseBot[] {
+    const rows = stmts.getAllBots.all() as Array<Record<string, unknown>>;
     return rows.map((row) => {
-      const jsonData = safeJson<Record<string, any>>(row.data);
+      const jsonData = safeJson<Record<string, unknown>>(
+        row.data as string | undefined,
+      );
       return {
-        jid: row.jid,
+        jid: String(row.jid),
         ...jsonData,
         data: jsonData,
-        bot_id: row.bot_id ?? jsonData.bot_id ?? row.jid,
-        bot_name: row.bot_name ?? jsonData.bot_name ?? null,
-        phone_number: row.phone_number ?? jsonData.phone_number ?? null,
-        lid: row.lid ?? jsonData.lid ?? null,
-        groups: safeJsonArray(row.groups ?? jsonData.groups),
+        bot_id: (row.bot_id ?? jsonData.bot_id ?? row.jid) as string,
+        bot_name: (row.bot_name ?? jsonData.bot_name ?? null) as string | null,
+        phone_number: (row.phone_number ?? jsonData.phone_number ?? null) as
+          string | null,
+        lid: (row.lid ?? jsonData.lid ?? null) as string | null,
+        groups: safeJsonArray(
+          (row.groups ?? jsonData.groups) as string | undefined,
+        ),
         isMain: Number(row.isMain ?? jsonData.isMain ?? 0),
-        status: row.status ?? jsonData.status ?? "offline",
-        modPrefix: row.modPrefix ?? jsonData.modPrefix ?? null,
+        status: (row.status ?? jsonData.status ?? "offline") as string,
+        modPrefix: (row.modPrefix ?? jsonData.modPrefix ?? null) as
+          string | null,
         modSelf: Number(row.modSelf ?? jsonData.modSelf ?? 0),
       };
     });
@@ -693,7 +751,9 @@ export const db = {
         continue;
       }
 
-      const currentData = safeJson<Record<string, any>>(current.data);
+      const currentData = safeJson<Record<string, unknown>>(
+        current.data as string | undefined,
+      );
       const changed =
         current.jid !== canonicalJid ||
         current.lid !== lid ||

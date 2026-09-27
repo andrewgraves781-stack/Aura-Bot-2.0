@@ -4,16 +4,14 @@ import { getAuraLevel } from "./economyConfig.ts";
 import { economyUser } from "./economyRuntime.ts";
 import { sendDownloadPreview } from "./downloadPreview.ts";
 import { LRUCache } from "lru-cache";
-export type Profile = Record<string, any>;
+import type { WAMessage } from "@whiskeysockets/baileys";
+import type { Profile, PendingProfileAction } from "../types/index.d.ts";
+import type { CommandContext } from "../types/commands.d.ts";
+import type { ExtendedWASocket } from "../types/socket.d.ts";
+
+export type { Profile };
 
 const PROFILE_REPOSITORY_URL = "https://github.com/jerielweb/Aura-Bot-2.0";
-
-type PendingProfileAction = {
-  kind: "marry" | "divorce";
-  from: string;
-  to: string;
-  expiresAt: number;
-};
 
 const pendingProfileActions = new LRUCache<string, PendingProfileAction>({
   max: 1000,
@@ -23,7 +21,7 @@ const pendingProfileActions = new LRUCache<string, PendingProfileAction>({
 export const DEFAULT_PFP =
   "https://i.pinimg.com/736x/af/a3/24/afa324dff15091f93624bb470d60a592.jpg";
 
-const DEFAULT_PROFILE = {
+const DEFAULT_PROFILE: Profile = {
   name: "Sin nombre",
   description: "Sin descripción",
   gender: "No definido",
@@ -36,15 +34,19 @@ const DEFAULT_PROFILE = {
 };
 
 export function getProfile(jid: string): Profile {
-  const user: Profile = (db.getUser(jid) ?? {}) as Profile;
-  const profile = { ...DEFAULT_PROFILE, ...user };
+  const user = db.getUser(jid);
+  const profile: Profile = {
+    ...DEFAULT_PROFILE,
+    ...user,
+    ...((user.data as Record<string, unknown> | undefined) || {}),
+  };
 
   if (profile.name === "Sin nombre" && user.username)
     profile.name = user.username;
   return profile;
 }
 
-export function updateProfile(jid: string, data: Profile) {
+export function updateProfile(jid: string, data: Partial<Profile>) {
   db.setUser(jid, data);
   return getProfile(jid);
 }
@@ -75,7 +77,7 @@ export function clearPendingProfileAction(action: PendingProfileAction) {
 }
 
 export async function getProfilePictureUrl(
-  socket: any,
+  socket: ExtendedWASocket,
   jid: string,
 ): Promise<string> {
   try {
@@ -85,11 +87,18 @@ export async function getProfilePictureUrl(
   }
 }
 
-export async function profileTarget(ctx: any): Promise<string> {
+export async function profileTarget(ctx: CommandContext): Promise<string> {
   const message = ctx.msg?.message ?? {};
+  type ContextInfo = {
+    mentionedJid?: string[];
+    quotedMessage?: unknown;
+    participant?: string;
+  };
   const contextInfos = Object.values(message)
-    .map((value: any) => value?.contextInfo)
-    .filter(Boolean) as any[];
+    .map(
+      (value) => (value as { contextInfo?: ContextInfo } | null)?.contextInfo,
+    )
+    .filter((c): c is ContextInfo => Boolean(c));
   const mentioned = contextInfos.flatMap(
     (context) => context.mentionedJid ?? [],
   );
@@ -121,10 +130,7 @@ export function formatProfile(
   const age = getAge(String(profile.birthDate ?? ""));
   const aura = Number(profile.aura ?? 0);
   const xp = Number(profile.auraXp ?? aura);
-  const level = Math.max(
-    1,
-    Number(profile.level ?? getAuraLevel(aura)),
-  );
+  const level = Math.max(1, Number(profile.level ?? getAuraLevel(aura)));
   const wallet = Number(profile.bolsillo ?? 0);
   const bank = Number(profile.banco ?? profile.bank ?? 0);
   const userId = `WB${jid.split("@")[0]}`;
@@ -160,7 +166,7 @@ export function formatProfile(
   return { text, mentions };
 }
 
-export async function sendProfilePreview(ctx: any, target: string) {
+export async function sendProfilePreview(ctx: CommandContext, target: string) {
   const profile = getProfile(target);
   const economy = economyUser(ctx, target);
   const { text, mentions } = formatProfile(target, {
@@ -178,8 +184,8 @@ export async function sendProfilePreview(ctx: any, target: string) {
       thumbnail: profileUrl,
       caption: text,
       link: PROFILE_REPOSITORY_URL,
-      title: "Aura Bot 2.0",
-      author: "Jeriel Web",
+      title: profile.name,
+      author: globalThis.DEFAULT_BOT_AUTHOR,
       sender: target,
       mentions,
     });
@@ -188,7 +194,7 @@ export async function sendProfilePreview(ctx: any, target: string) {
     return ctx.sock.sendMessage(
       ctx.from,
       { image: { url: profileUrl }, caption: text, mentions },
-      { quoted: ctx.msg },
+      { quoted: ctx.msg as unknown as WAMessage },
     );
   } catch {
     return ctx.reply({ text, mentions });

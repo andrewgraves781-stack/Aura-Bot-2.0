@@ -1,10 +1,11 @@
+import type { CommandContext } from "../../types/index.d.ts";
 export default {
   name: ["self", "setself"],
   description: "Activa o desactiva el modo self del grupo.",
   category: "socket",
   groupOnly: true,
   modOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const value = String(ctx.args?.[0] ?? "").toLowerCase();
     if (!["on", "off", "true", "false", "1", "0"].includes(value)) {
       return ctx.reply(`⚠️ Uso: ${ctx.usedPrefix ?? "."}self on|off`);

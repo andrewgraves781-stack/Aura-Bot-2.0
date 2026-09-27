@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   cooldownText,
   formatCoins,
@@ -10,7 +11,7 @@ export default {
   name: ["monthly", "mensual"],
   category: "economy",
   description: "Reclama tu recompensa mensual con sistema de racha.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const user = getEconomyUser(ctx.from, ctx.sender, {
       lastMonthly: 0,
       monthlyStreak: 0,

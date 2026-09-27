@@ -1,10 +1,11 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { updateProfile } from "../../core/profileConfig.ts";
 import { fytBold } from "./../../core/socketText.ts";
 export default {
   name: ["setdesc", "descripcion", "bio"],
   description: "Cambia tu descripción.",
   category: "profile",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     if (!ctx.text) return ctx.reply("Uso: .setdesc Tu descripción");
     updateProfile(ctx.sender, { description: ctx.text.slice(0, 120) });
 

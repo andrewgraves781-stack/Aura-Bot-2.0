@@ -1,10 +1,11 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
   name: ["setmeta", "metasticker", "sticker-meta"],
   category: "sticker",
   description: "Configura el pack y autor de tus stickers.",
-  async run({ args, db, sender, usedPrefix, reply }: any) {
+  async run({ args, db, sender, usedPrefix, reply }: CommandContext) {
     const user = db.getUser(sender);
     const currentPack =
       user.stickerPackName || user.data?.stickerPackName || "Aura Reed";

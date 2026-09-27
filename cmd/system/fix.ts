@@ -1,3 +1,5 @@
+import type { WAMessage } from "@whiskeysockets/baileys";
+import type { CommandContext } from "../../types/index.d.ts";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fytBold } from "../../core/socketText.ts";
@@ -10,7 +12,7 @@ export default {
   description: "Actualiza el bot desde los cambios disponibles en Git.",
   modOnly: true,
 
-  async run({ sock, from, msg }: any) {
+  async run({ sock, from, msg }: CommandContext) {
     let initText = `╭〔 🚀 ${fytBold("AURA REED")} 〕⬣\n`;
     initText += `┃ ⚙️ ${fytBold("SISTEMA UPDATE")}\n`;
     initText += `╰━━━━━━━━━━━━⬣\n\n`;
@@ -20,7 +22,7 @@ export default {
     const sent = await sock.sendMessage(
       from,
       { text: initText },
-      { quoted: msg },
+      { quoted: msg as unknown as WAMessage },
     );
 
     try {
@@ -48,10 +50,14 @@ export default {
       return await sock.sendMessage(
         from,
         { text, edit: sent.key },
-        { quoted: msg },
+        { quoted: msg as unknown as WAMessage },
       );
-    } catch (error: any) {
-      const details = [error?.stdout, error?.stderr, error?.message]
+    } catch (error: unknown) {
+      const details = [
+        (error as { stdout?: string }).stdout,
+        (error as { stderr?: string }).stderr,
+        error instanceof Error ? error.message : String(error),
+      ]
         .filter(Boolean)
         .join("\n")
         .trim();
@@ -67,10 +73,14 @@ export default {
         return await sock.sendMessage(
           from,
           { text, edit: sent.key },
-          { quoted: msg },
+          { quoted: msg as unknown as WAMessage },
         );
       } catch {
-        return sock.sendMessage(from, { text }, { quoted: msg });
+        return sock.sendMessage(
+          from,
+          { text },
+          { quoted: msg as unknown as WAMessage },
+        );
       }
     }
   },

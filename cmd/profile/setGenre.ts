@@ -1,10 +1,11 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { updateProfile } from "../../core/profileConfig.ts";
 import { fytBold } from "./../../core/socketText.ts";
 export default {
   name: ["setgenre", "genero"],
   description: "Cambia tu género.",
   category: "profile",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     if (!ctx.text) return ctx.reply("Uso: .setgenre Género");
     updateProfile(ctx.sender, { gender: ctx.text.slice(0, 30) });
 

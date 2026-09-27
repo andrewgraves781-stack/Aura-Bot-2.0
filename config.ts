@@ -49,9 +49,9 @@ export const DL_CONFIG = {
 globalThis.DEFAULT_PREFIXES = [".", "#", "/", "!", "-", "%", "$"];
 globalThis.DEFAULT_BOT_NAME = "AURA REED";
 globalThis.DEFAULT_BOT_VERSION = "2.0.0";
-globalThis.DEFAULT_BOT_AUTHOR = "𝘗𝘰𝘸𝘦𝘳𝘦𝘥 𝘉𝘺: 𝕵𝖊𝖗𝖎𝖊𝖑 𝕭.";
+globalThis.DEFAULT_BOT_AUTHOR = "𝑷𝒐𝒘𝒆𝒓𝒆𝒅 𝑩𝒚: Jeriel B.";
 globalThis.DEFAULT_BOT_DESCRIPTION = "";
-globalThis.DEFAULT_BOT_OWNER = "𝕵𝖊𝖗𝖎𝖊𝖑 𝕭.";
+globalThis.DEFAULT_BOT_OWNER = "𝐉𝐞𝐫𝐢𝐞𝐥 𝐁";
 
 globalThis.DEFAULT_USER_ROLES = [
   {

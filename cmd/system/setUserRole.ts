@@ -1,14 +1,18 @@
+import type { proto } from "@whiskeysockets/baileys";
+import type { CommandContext } from "../../types/index.d.ts";
 import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import { db } from "../../dbController/db.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 const roles = ["user", "mod", "coowner", "owner"];
 
-function getTarget(ctx: any): string | null {
+function getTarget(ctx: CommandContext): string | null {
   const message = ctx.msg?.message ?? {};
   const infos = Object.values(message)
-    .map((value: any) => value?.contextInfo)
-    .filter(Boolean) as any[];
+    .map(
+      (value) => (value as { contextInfo?: proto.IContextInfo })?.contextInfo,
+    )
+    .filter((info): info is proto.IContextInfo => Boolean(info));
   const target =
     infos.flatMap((info) => info.mentionedJid ?? [])[0] ??
     infos.find((info) => info.quotedMessage)?.participant;
@@ -21,7 +25,7 @@ export default {
   description: "Asigna un rol persistente a un usuario.",
   ownerOnly: true,
 
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const role = String(ctx.args?.[0] ?? "").toLowerCase();
     const target = getTarget(ctx);
 

@@ -1,4 +1,14 @@
+import type { CommandContext } from "../../types/index.d.ts";
+import type { DatabaseBot } from "../../types/database.d.ts";
+import type { proto } from "@whiskeysockets/baileys";
 import { fytBold } from "../../core/socketText.ts";
+
+type BotParticipant = {
+  id?: string;
+  lid?: string;
+  jid?: string;
+  phoneNumber?: string;
+};
 
 function normalize(value: unknown): string {
   return String(value || "")
@@ -11,15 +21,15 @@ function isPhoneJid(value: unknown): boolean {
 }
 
 async function getBotMention(
-  bot: any,
-  participants: any[],
+  bot: DatabaseBot,
+  participants: BotParticipant[],
   resolveLid?: (jid: string) => Promise<string>,
 ): Promise<string> {
   const directJid = [bot.jid, bot.data?.jid, bot.phone_number].find(isPhoneJid);
   if (directJid) return normalize(directJid);
 
   const identities = [bot.bot_id, bot.lid, bot.jid].map(normalize);
-  const participant = participants.find((entry: any) =>
+  const participant = participants.find((entry: BotParticipant) =>
     [entry?.id, entry?.lid, entry?.jid, entry?.phoneNumber]
       .map(normalize)
       .some((jid: string) => jid && identities.includes(jid)),
@@ -42,10 +52,21 @@ async function getBotMention(
   return "";
 }
 
-function getTargetFromMessage(message: any): string | null {
+function getTargetFromMessage(message: proto.IWebMessageInfo): string | null {
   const contextInfos = Object.values(message?.message ?? {})
-    .map((value: any) => value?.contextInfo)
-    .filter(Boolean) as any[];
+    .map(
+      (value) =>
+        (
+          value as {
+            contextInfo?: {
+              mentionedJid?: string[];
+              quotedMessage?: unknown;
+              participant?: string;
+            };
+          } | null
+        )?.contextInfo,
+    )
+    .filter((c): c is NonNullable<typeof c> => Boolean(c));
   const mentioned = contextInfos.flatMap(
     (context) => context.mentionedJid ?? [],
   );
@@ -74,7 +95,7 @@ export default {
     botJid,
     groupMeta,
     resolveLid,
-  }: any) {
+  }: CommandContext) {
     const requestedBot = normalize(getTargetFromMessage(msg) || args[0] || "");
 
     if (cmdName === "delprimary") {
@@ -127,12 +148,14 @@ export default {
       groupMeta?.participants || [],
       resolveLid,
     );
-    const targetName = String(selectedBot?.bot_name || "Bot seleccionado").trim();
+    const targetName = String(
+      selectedBot?.bot_name || "Bot seleccionado",
+    ).trim();
     return reply({
       text: mentionJid
         ? `✅ ${fytBold("Bot primario configurado")}: @${mentionJid.split("@")[0]}`
         : `✅ ${fytBold("Bot primario configurado")}: ${targetName}`,
       mentions: mentionJid ? [mentionJid] : [],
     });
-  }
+  },
 };

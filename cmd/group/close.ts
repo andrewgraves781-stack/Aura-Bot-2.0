@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 export default {
   name: ["close", "cerrar"],
@@ -6,7 +7,7 @@ export default {
   groupOnly: true,
   adminOnly: true,
   botAdmin: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     await ctx.sock.groupSettingUpdate(ctx.from, "announcement");
     return ctx.reply(
       `╭〔 🔒 ${fytBold("ADMIN SYSTEM")} 〕⬣\n┃ ✅ ${fytBold("GRUPO CERRADO")}\n╰━━━━━━━━━━━━⬣\n\n┃ > Solo administradores pueden mensajear.\n╰〔 ⚡ AURA REED 〕⬣`,

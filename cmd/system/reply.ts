@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import {
   REPORT_GROUP_JID,
@@ -11,9 +12,10 @@ import {
 export default {
   name: ["reply", "replyreport", "responderreport"],
   category: "system",
-  description: "Responde un reporte y devuelve la respuesta a su chat original.",
+  description:
+    "Responde un reporte y devuelve la respuesta a su chat original.",
   groupOnly: true,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     if (ctx.from !== REPORT_GROUP_JID)
       return ctx.reply("⚠️ Este comando solo funciona en el grupo de soporte.");
 
@@ -23,7 +25,8 @@ export default {
       return ctx.reply(
         `⚠️ ${fytBold("REPORTE NO ENCONTRADO")}\n\n┃ > Responde directamente al mensaje del reporte y escribe tu respuesta.`,
       );
-    if (!response) return ctx.reply("⚠️ Escribe la respuesta después de .repli.");
+    if (!response)
+      return ctx.reply("⚠️ Escribe la respuesta después de .repli.");
 
     try {
       await sendWithAvailableBot(
@@ -35,7 +38,9 @@ export default {
       return ctx.reply(`✅ ${fytBold("RESPUESTA ENVIADA")} › ${report.id}`);
     } catch (error) {
       console.error("[repli] No se pudo devolver la respuesta:", error);
-      return ctx.reply("❌ Ningún bot pudo enviar la respuesta al chat original.");
+      return ctx.reply(
+        "❌ Ningún bot pudo enviar la respuesta al chat original.",
+      );
     }
   },
 };

@@ -1,3 +1,4 @@
+import type { CommandContext, CommandPlugin } from "../../types/index.d.ts";
 import { forgetActiveSubBot } from "../../core/subbotManager.ts";
 
 export default {
@@ -7,21 +8,23 @@ export default {
   botUserOnly: true,
   privateOnly: true,
 
-  async run({ reply, sock, db }: any) {
+  async run({ reply, sock, db }: CommandContext) {
     await reply({ text: "⏳ Cerrando la sesión de este bot..." });
-    (sock as any).manualLogout = true;
-    forgetActiveSubBot(String((sock as any).sessionName || ""));
+    sock.manualLogout = true;
+    forgetActiveSubBot(String(sock.sessionName || ""));
 
     try {
       await sock.logout();
-    } catch (error: any) {
-      (sock as any).manualLogout = false;
-      db.setBot(String(sock.user?.id || (sock as any).sessionName || ""), {
+    } catch (error: unknown) {
+      sock.manualLogout = false;
+      db.setBot(String(sock.user?.id || sock.sessionName || ""), {
         status: "offline",
       });
+      const message =
+        error instanceof Error ? error.message : "Error desconocido";
       await reply({
-        text: `❌ No se pudo cerrar la sesión: ${error?.message || "Error desconocido"}`,
+        text: `❌ No se pudo cerrar la sesión: ${message}`,
       });
     }
   },
-};
+} satisfies CommandPlugin;

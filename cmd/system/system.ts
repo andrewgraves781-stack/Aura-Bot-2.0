@@ -1,3 +1,5 @@
+import type { WAMessage } from "@whiskeysockets/baileys";
+import type { CommandContext } from "../../types/index.d.ts";
 import os from "node:os";
 import process from "node:process";
 import fs from "node:fs";
@@ -69,7 +71,7 @@ export default {
   description: "Muestra los componentes reales del sistema asignado.",
   ownerOnly: false,
 
-  async run({ sock, from, msg }: any) {
+  async run({ sock, from, msg }: CommandContext) {
     const cpus = os.cpus();
     const cpuModel = cpus[0]?.model?.trim() || "Desconocido";
     let cpuCores = cpus.length || 1;
@@ -110,6 +112,10 @@ export default {
     text += `┃ > ${fytBold("PID:")} ${process.pid}\n\n`;
     text += "╰━━━━━━━━━━━━⬣";
 
-    return sock.sendMessage(from, { text }, { quoted: msg });
+    return sock.sendMessage(
+      from,
+      { text },
+      { quoted: msg as unknown as WAMessage },
+    );
   },
 };

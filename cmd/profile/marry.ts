@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import {
   profileTarget,
   getProfile,
@@ -8,7 +9,7 @@ export default {
   name: ["marry", "casarse", "matrimonio"],
   description: "Propone matrimonio a un usuario mencionado.",
   category: "profile",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const target = await profileTarget(ctx);
     if (target === ctx.sender)
       return ctx.reply("❌ Debes mencionar a otra persona.");

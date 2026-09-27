@@ -1,9 +1,14 @@
+import type {
+  BannerMediaMessage,
+  LinkPreviewContextInfo,
+} from "../types/media.d.ts";
+
 type LinkPreviewOptions = {
   textOriginal: string;
   link: string;
   author?: string;
   title?: string;
-  banner?: any;
+  banner?: BannerMediaMessage;
   mentionedJid?: string[];
   isForwarded?: boolean;
   forwardingScore?: number;
@@ -20,20 +25,20 @@ function getTimestamp(value: unknown): number {
 
 function buildLinkPreview(
   {
-  textOriginal,
-  link,
-  author = "",
-  title = "",
-  banner,
-  mentionedJid = [],
-  isForwarded = true,
-  forwardingScore = 1,
-  newsletterJid = "120363424808187278@newsletter",
-  newsletterName = "⋆ Aura Reed Channel Official ⋆",
+    textOriginal,
+    link,
+    author = "",
+    title = "",
+    banner,
+    mentionedJid = [],
+    isForwarded = true,
+    forwardingScore = 1,
+    newsletterJid = "120363424808187278@newsletter",
+    newsletterName = "⋆ Aura Reed Channel Official ⋆",
   }: LinkPreviewOptions,
   includeChannel: boolean,
 ) {
-  const contextInfo: Record<string, any> = {
+  const contextInfo: LinkPreviewContextInfo = {
     mentionedJid,
     isForwarded,
     forwardingScore,
@@ -78,5 +83,3 @@ export function createLinkPreviewWithoutChannel(options: LinkPreviewOptions) {
 }
 
 export const LINK_PREVIEW_MAP = createLinkPreview;
-
-

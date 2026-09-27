@@ -5,13 +5,18 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { fetch } from "undici";
+import type { SearchItem } from "../types/index.d.ts";
 
 const HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AuraReedBot/2.0",
+  "User-Agent":
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 AuraReedBot/2.0",
   Accept: "application/json, text/plain, */*",
 };
 
-export async function requestJson(url: string, timeout = 30000): Promise<any> {
+export async function requestJson<T = Record<string, unknown>>(
+  url: string,
+  timeout = 30000,
+): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -21,13 +26,16 @@ export async function requestJson(url: string, timeout = 30000): Promise<any> {
         redirect: "follow",
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.json();
+      return (await response.json()) as T;
     } catch (error) {
       lastError = error;
-      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+      if (attempt < 2)
+        await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("Solicitud fallida.");
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Solicitud fallida.");
 }
 
 const CACHE_DIR = path.resolve(process.env.GLOBAL_CUSTOM_TMP || "./cache");
@@ -35,6 +43,7 @@ const CACHE_DIR = path.resolve(process.env.GLOBAL_CUSTOM_TMP || "./cache");
 export async function downloadToCache(
   url: string,
   timeout = 180000,
+  headers: Record<string, string> = {},
 ): Promise<string> {
   await mkdir(CACHE_DIR, { recursive: true });
   const cacheKey = createHash("sha256").update(url).digest("hex").slice(0, 32);
@@ -55,14 +64,16 @@ export async function downloadToCache(
     );
     try {
       const response = await fetch(url, {
-        headers: HEADERS,
+        headers: { ...HEADERS, ...headers },
         signal: AbortSignal.timeout(timeout),
         redirect: "follow",
       });
       if (!response.ok) throw new Error(`Descarga HTTP ${response.status}`);
       if (!response.body) throw new Error("La descarga no devolvió contenido.");
       await pipeline(
-        Readable.fromWeb(response.body as any),
+        Readable.fromWeb(
+          response.body as import("node:stream/web").ReadableStream,
+        ),
         createWriteStream(partialPath),
       );
       await rename(partialPath, filePath);
@@ -70,7 +81,8 @@ export async function downloadToCache(
     } catch (error) {
       lastError = error;
       await rm(partialPath, { force: true }).catch(() => {});
-      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 700 * 2 ** attempt));
+      if (attempt < 2)
+        await new Promise((resolve) => setTimeout(resolve, 700 * 2 ** attempt));
     }
   }
   throw lastError instanceof Error ? lastError : new Error("Descarga fallida.");
@@ -85,7 +97,10 @@ export function safeFileName(value: unknown, fallback: string): string {
   );
 }
 
-export function pickSearchResult(results: unknown, query: string): any | null {
+export function pickSearchResult<T extends SearchItem = SearchItem>(
+  results: unknown,
+  query: string,
+): T | null {
   if (!Array.isArray(results)) return null;
 
   const terms = String(query || "")
@@ -97,8 +112,10 @@ export function pickSearchResult(results: unknown, query: string): any | null {
 
   return (
     results
-      .filter((result: any) => result?.url)
-      .map((result: any, index: number) => {
+      .filter((result: unknown): result is T =>
+        Boolean(result && typeof result === "object" && "url" in result),
+      )
+      .map((result: T, index: number) => {
         const searchable = [
           result.title,
           result.desc,
@@ -120,6 +137,14 @@ export function pickSearchResult(results: unknown, query: string): any | null {
         (left, right) => right.score - left.score || left.index - right.index,
       )[0]?.result || null
   );
+}
+
+export function FormatTimeContent(time: number): string[] {
+  const h = Math.floor(time / 3600);
+  const m = Math.floor((time % 3600) / 60);
+  const s = time % 60;
+
+  return [h, m, s].map((v) => v.toString().padStart(2, "0"));
 }
 
 export function formatCount(value: unknown): string {

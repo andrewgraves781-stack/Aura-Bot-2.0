@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 export default {
@@ -6,7 +7,7 @@ export default {
   description: "Personaliza el mensaje de bienvenida.",
   groupOnly: true,
   adminOnly: false,
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const value =
       typeof ctx.rawText === "string" ? ctx.rawText : ctx.args.join(" ");
     const normalizedValue = value.trim();

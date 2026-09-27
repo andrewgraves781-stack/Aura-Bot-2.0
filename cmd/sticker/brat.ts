@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { request } from "undici";
 import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
@@ -23,7 +24,7 @@ export default {
   name: ["brat"],
   category: "sticker",
   description: "Convierte texto en sticker estilo brat.",
-  async run({ args, msg, db, sender, react, reply }: any) {
+  async run({ args, msg, db, sender, react, reply }: CommandContext) {
     const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const quotedText =
       quoted?.conversation || quoted?.extendedTextMessage?.text || "";
@@ -48,10 +49,10 @@ export default {
       );
       await react("✅");
       return reply({ sticker: finalSticker, mimetype: "image/webp" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ⚠️ ERROR AL CREAR STICKER\n╰━━━━━━━━━━━━⬣\n\n┃ > ${error?.message || "No se pudo generar el sticker."}\n╰〔 ⚡ SYSTEM 〕⬣`,
+        text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ⚠️ ERROR AL CREAR STICKER\n╰━━━━━━━━━━━━⬣\n\n┃ > ${error instanceof Error ? error.message : String(error) || "No se pudo generar el sticker."}\n╰〔 ⚡ SYSTEM 〕⬣`,
       });
     }
   },

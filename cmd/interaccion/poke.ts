@@ -1,3 +1,7 @@
+import type {
+  CommandContext,
+  InteractionApiResponse,
+} from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
 import ffmpegPath from "ffmpeg-static";
@@ -64,7 +68,7 @@ export default {
   description: "Envía una reacción de picar (nekos.best).",
   category: "interaction",
 
-  async run({ reply, react, msg, sender, text, db }: any) {
+  async run({ reply, react, msg, sender, text, db }: CommandContext) {
     await react("👉");
 
     try {
@@ -103,7 +107,7 @@ export default {
       if (response.statusCode !== 200)
         throw new Error(`HTTP ${response.statusCode}`);
 
-      let data: any;
+      let data: InteractionApiResponse;
       try {
         data = JSON.parse(bodyText);
       } catch {
@@ -137,9 +141,11 @@ export default {
         gifPlayback: true,
         mentions,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await react("❌");
-      await reply({ text: `❌ Error: ${error?.message}` });
+      await reply({
+        text: `❌ Error: ${error instanceof Error ? error.message : String(error)}`,
+      });
     }
   },
 };

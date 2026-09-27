@@ -1,10 +1,11 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { getProfile, profileTarget } from "../../core/profileConfig.ts";
 
 export default {
   name: ["lvl", "level", "nivel", "rango"],
   description: "Muestra tu rango Aura.",
   category: "profile",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const target = await profileTarget(ctx);
     const aura = Number(getProfile(target).aura ?? 0);
     return ctx.reply({

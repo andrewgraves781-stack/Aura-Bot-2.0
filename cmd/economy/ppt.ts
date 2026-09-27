@@ -1,3 +1,4 @@
+import type { CommandContext } from "../../types/index.d.ts";
 import { cooldownText } from "../../core/economyConfig.ts";
 import {
   economyUser,
@@ -16,7 +17,7 @@ export default {
   name: ["ppt", "juego", "rps", "desafio", "retar"],
   category: "economy",
   description: "Juega Piedra, Papel o Tijera contra Aura Reed.",
-  async run(ctx: any) {
+  async run(ctx: CommandContext) {
     const user = economyUser(ctx, ctx.sender);
     const choice = String(ctx.args?.[0] ?? "").toLowerCase();
     const now = Date.now();
