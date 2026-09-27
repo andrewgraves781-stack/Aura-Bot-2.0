@@ -209,6 +209,9 @@ function getUserRow(input: string, lid?: string | null): UserDbRow | undefined {
     values.push(lid);
   }
 
+  // Sin condiciones no se puede construir una WHERE válida → nada que buscar.
+  if (conditions.length === 0) return undefined;
+
   const queryKey = conditions.join(" OR ");
   let stmt = userStmtCache.get(queryKey);
   if (!stmt) {

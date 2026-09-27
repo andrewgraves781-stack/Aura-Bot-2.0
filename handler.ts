@@ -656,6 +656,35 @@ export async function handleMessage(
     if (isGroup) {
       const groupData = runtimeDb.getGroup(from);
 
+      // ── Protecciones de seguridad: se evalúan SIEMPRE antes de cualquier
+      //    restricción de acceso (self, modSelf, chatBanned, etc.) para que
+      //    funcionen incluso cuando el grupo está en modo self o modself. ──
+      if (
+        groupData?.antilink &&
+        body &&
+        !isAdmin &&
+        !isMod &&
+        !isCmd &&
+        !msg.key?.fromMe
+      ) {
+        const checkFn = runtimeOptions.checkAntilink;
+        if (checkFn) {
+          const handled = await checkFn({
+            sock,
+            msg,
+            from,
+            sender,
+            body,
+            isAdmin,
+            isOwner,
+            isBotAdmin,
+            botLabel,
+          });
+          if (handled) return;
+        }
+      }
+
+      // ── Restricciones de acceso ──
       const modSelfEnabled = Number(botRecord.modSelf ?? 0) === 1;
       const groupSelfDisabled =
         groupData?.data?.selfConfigured === true && groupData.self === 0;
@@ -683,24 +712,6 @@ export async function handleMessage(
 
       if (groupData?.onlyAdmin && isCmd && !isAdmin && !isMod && !isBotUser) {
         return;
-      }
-
-      if (groupData?.antilink && body && !isAdmin && !isMod && !isCmd) {
-        const checkFn = runtimeOptions.checkAntilink;
-        if (checkFn) {
-          const handled = await checkFn({
-            sock,
-            msg,
-            from,
-            sender,
-            body,
-            isAdmin,
-            isOwner,
-            isBotAdmin,
-            botLabel,
-          });
-          if (handled) return;
-        }
       }
 
       if (!isCmd && body) {
