@@ -114,6 +114,13 @@ export async function profileTarget(ctx: CommandContext): Promise<string> {
   return target;
 }
 
+/** Extrae los @números escritos en texto libre y los convierte en JIDs
+ *  para que WhatsApp los renderice como menciones clickeables. */
+function extractMentionJids(text: string): string[] {
+  const matches = text.match(/@(\d{5,15})/g) ?? [];
+  return matches.map((m) => `${m.slice(1)}@s.whatsapp.net`);
+}
+
 export function formatProfile(
   jid: string,
   profile = getProfile(jid),
@@ -121,10 +128,14 @@ export function formatProfile(
   const about = jid.split("@")[0];
   const mentions: string[] = [jid];
 
+  // Menciones escritas en la descripción (@número → JID)
+  const descMentions = extractMentionJids(String(profile.description ?? ""));
+  if (descMentions.length > 0) mentions.push(...descMentions);
+
   let spouse = "Soltero/a";
   if (profile.marriedTo) {
     spouse = `@${String(profile.marriedTo).split("@")[0]}`;
-    mentions.push(profile.marriedTo, profile.description);
+    mentions.push(profile.marriedTo);
   }
 
   const age = getAge(String(profile.birthDate ?? ""));
@@ -166,6 +177,32 @@ export function formatProfile(
   return { text, mentions };
 }
 
+/**
+ * Para cada JID de teléfono en `mentions`, intenta obtener su LID equivalente
+ * y lo agrega al array (sin duplicados). Esto permite que WhatsApp mencione
+ * correctamente a usuarios que solo tienen LID activo.
+ */
+async function resolvePhoneJidsToLids(
+  sock: ExtendedWASocket,
+  mentions: string[],
+): Promise<void> {
+  const extras: string[] = [];
+  for (const jid of mentions) {
+    if (!jid.endsWith("@s.whatsapp.net")) continue;
+    try {
+      const lid = await sock.signalRepository?.lidMapping
+        ?.getLIDForPN(jid)
+        .catch(() => null);
+      if (lid && !mentions.includes(lid) && !extras.includes(lid)) {
+        extras.push(lid);
+      }
+    } catch {
+      // Sin LID resolvible, se ignora.
+    }
+  }
+  mentions.push(...extras);
+}
+
 export async function sendProfilePreview(ctx: CommandContext, target: string) {
   const profile = getProfile(target);
   const economy = economyUser(ctx, target);
@@ -174,6 +211,10 @@ export async function sendProfilePreview(ctx: CommandContext, target: string) {
     bolsillo: economy.bolsillo,
     banco: economy.banco,
   });
+
+  // Enriquece las menciones con LIDs para usuarios que ya migraron al nuevo
+  // sistema de identidades de WhatsApp.
+  await resolvePhoneJidsToLids(ctx.sock, mentions);
 
   try {
     const profileUrl = await getProfilePictureUrl(ctx.sock, target);
