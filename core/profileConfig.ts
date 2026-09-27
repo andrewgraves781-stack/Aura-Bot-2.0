@@ -124,7 +124,7 @@ export function formatProfile(
   let spouse = "Soltero/a";
   if (profile.marriedTo) {
     spouse = `@${String(profile.marriedTo).split("@")[0]}`;
-    mentions.push(profile.marriedTo);
+    mentions.push(profile.marriedTo, profile.description);
   }
 
   const age = getAge(String(profile.birthDate ?? ""));
