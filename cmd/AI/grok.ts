@@ -17,7 +17,7 @@ export default {
 
     await react("🤖");
     try {
-      const response = await askAlya("/coreai/grok", prompt);
+      const response = await askAlya("/ai/grok", prompt);
       await reply({
         text: `╭〔 🤖 ${fytBold("GROK AI")} 〕⬣\n\n${response}\n\n╰〔 ⚡ ${fytBold("SYSTEM AI")} 〕⬣`,
       });
