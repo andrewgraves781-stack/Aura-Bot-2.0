@@ -3,9 +3,9 @@ import { fytBold } from "../../core/socketText.ts";
 import { aiError, askAlya, getPrompt } from "./aiUtils.ts";
 
 export default {
-  name: ["gemini", "gia", "gai", "genai"],
+  name: ["grok", "kia", "gkai"],
   category: "AI",
-  description: "Habla con Gemini.",
+  description: "Habla con Grok.",
 
   async run({ args, reply, react }: CommandContext) {
     const prompt = getPrompt(args);
