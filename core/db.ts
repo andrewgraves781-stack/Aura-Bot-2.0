@@ -847,6 +847,8 @@ export const db: IDatabase = {
           phone,
           role,
           0,
+          100000,
+          10000,
           JSON.stringify({ jid: canonicalJid, lid, role }),
         );
         continue;
