@@ -60,8 +60,12 @@ ${categories.map((category) => `┃ > ${disabled.includes(category) ? "❌" : "�
       : disabled.filter((category: string) => category !== target);
 
     ctx.db.setGroup(ctx.from, { catBlocked: nextDisabled });
-    return ctx.reply({
-      text: `${shouldDisable ? "❌" : "✅"} El catálogo *${target}* ha sido ${shouldDisable ? "desactivado" : "activado"} para este grupo.`,
-    });
+    let textCmd = `╭〔 ${fytBold("AURA REED")} 〕━⬣\n`
+    textCmd += `┃ ${shouldDisable ? "❌ CAT BLOQUEADO" : "✅ DESBLOQEADO"}\n`
+    textCmd += `╰━━━━━━━━━━━━⬣\n`
+    textCmd += `┃ > El catálogo *${target}* ha sido este grupo.\n`
+    textCmd += `${shouldDisable ? "desactivado" : "activado"} para este grupo.\n`
+    textCmd += `╰━━〔 ${fytBold("ADMIN SYSTEM")} 〕━━⬣`
+    return ctx.reply({text: textCmd});
   },
 };
