@@ -1,14 +1,25 @@
 import { fytBold } from "../../core/socketText.ts";
-import { requestJson, safeFileName } from "../../core/downloadUtils.ts";
+import {
+  downloadToCache,
+  requestJson,
+  safeFileName,
+} from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { sendDownloadPreview } from "../../core/downloadPreview.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 import type { CommandContext, SpotifyResponse } from "../../types/index.d.ts";
 
 export default {
   name: ["spotifydoc", "docsplay", "dsp", "dspdl"],
   category: "download",
   description: "Descarga Spotify como documento MP3.",
-  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react, sock, from, msg, sender } = ctx;
     const query = args.join(" ").trim();
     if (!query) return reply("⚠️ Ingresa una canción o enlace de Spotify.");
     await react("🎵");
@@ -32,7 +43,9 @@ export default {
         (isUrl
           ? query.split("?")[0]
           : `https://open.spotify.com/search/${encodeURIComponent(title)}`);
-      const caption = `╭〔 🎵 ${fytBold("SPOTIFY DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${song.artist || "Desconocido"}\n┃ > ${fytBold("Álbum")} › ${song.album || "Desconocido"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold("Url")} › ${originalUrl}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const file = await downloadToCache(download);
+      const { cost } = await prepareDownloadCharge(ctx, "document", file);
+      const caption = `╭〔 🎵 ${fytBold("SPOTIFY DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${song.artist || "Desconocido"}\n┃ > ${fytBold("Álbum")} › ${song.album || "Desconocido"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${originalUrl}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const cover = song.coverHd || song.cover;
       const hasPreview = cover
         ? await sendDownloadPreview({
@@ -49,10 +62,11 @@ export default {
         : false;
       if (!hasPreview) await reply({ text: caption });
       await reply({
-        document: { url: download },
+        document: { url: file },
         mimetype: "audio/mpeg",
         fileName: `${safeFileName(title, "spotify")}.mp3`,
       });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

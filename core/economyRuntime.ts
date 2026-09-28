@@ -1,8 +1,10 @@
 import { jidNormalizedUser, type proto } from "@whiskeysockets/baileys";
-import { addAura } from "./economyConfig.ts";
 import {
-  formatCoins,
+  addAura,
+  formatMoney,
+  getBotCurrency,
   getEconomyUser,
+  setBotCurrency,
   setEconomyUser,
 } from "./economyConfig.ts";
 import type { CommandContext, EconomyUser } from "../types/index.d.ts";
@@ -31,7 +33,7 @@ export function economyUser(
   ctx: CommandContext,
   jid = ctx.sender,
 ): EconomyUser {
-  return getEconomyUser(ctx.from, jid, { bolsillo: 0, banco: 0 });
+  return getEconomyUser(ctx.from, jid);
 }
 
 export function saveEconomy(
@@ -52,4 +54,10 @@ export function amountArg(value: unknown): number {
   return Number.isFinite(amount) ? amount : 0;
 }
 
-export { formatCoins, getEconomyUser, setEconomyUser };
+export {
+  formatMoney,
+  getBotCurrency,
+  setBotCurrency,
+  getEconomyUser,
+  setEconomyUser,
+};

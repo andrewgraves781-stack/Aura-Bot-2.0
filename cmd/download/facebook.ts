@@ -6,14 +6,20 @@ import type {
 import { fytBold } from "../../core/socketText.ts";
 import { downloadToCache, requestJson } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
-
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
 
 export default {
   name: ["fb", "facebook", "fbdl", "facebookdl", "fbvideo", "fbv", "fbreels"],
   category: "download",
   description: "Descarga videos de Facebook y Reels.",
-  async run({ args, reply, react }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react } = ctx;
     const url = args.join(" ").trim();
     if (!url)
       return reply("⚠️ Proporciona un enlace de Facebook o Facebook Reels.");
@@ -48,7 +54,6 @@ export default {
       if (!data?.status || !videoUrl)
         throw new Error("La API no devolvió un video descargable.");
       const quality = (typeof item === "object" ? item?.quality : null) || "HD";
-      const caption = `╭〔 🎥 ${fytBold("FACEBOOK VIDEO")} 〕━⬣\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Calidad")} › ${quality}\n┃ > ${fytBold("Tipo")} › Video MP4\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const file = await downloadToCache(videoUrl, 180000, {
         Accept: "video/*,*/*;q=0.8",
         Origin: "https://www.facebook.com",
@@ -56,12 +61,15 @@ export default {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
       });
+      const { cost } = await prepareDownloadCharge(ctx, "video", file);
+      const caption = `╭〔 🎥 ${fytBold("FACEBOOK VIDEO")} 〕━⬣\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Calidad")} › ${quality}\n┃ > ${fytBold("Tipo")} › Video MP4\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       await reply({
         video: { url: file },
         mimetype: "video/mp4",
         fileName: "facebook.mp4",
         caption,
       });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

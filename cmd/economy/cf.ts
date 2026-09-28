@@ -1,9 +1,9 @@
 import type { CommandContext } from "../../types/index.d.ts";
 import {
   cooldownText,
-  formatCoins,
   getEconomyUser,
   setEconomyUser,
+  formatMoney,
 } from "../../core/economyConfig.ts";
 
 export default {
@@ -28,7 +28,7 @@ export default {
     }
     if (user.bolsillo < amount)
       return ctx.reply(
-        `❌ No tienes suficientes monedas. Tienes *₡${formatCoins(user.bolsillo)}*.`,
+        `❌ No tienes suficientes monedas. Tienes *${formatMoney(user.bolsillo, ctx)}*.`,
       );
     if (user.lastCf && now - user.lastCf < cooldown) {
       return ctx.reply(
@@ -46,8 +46,8 @@ export default {
     let text = `╭〔 🪙 𝐂𝐀𝐑𝐀 𝐎 𝐂𝐑𝐔𝐙 〕⬣\n`;
     text += `┃ 🎲 Resultado: *${result.toUpperCase()}*\n`;
     text += `┃ 🎯 Elegiste: *${choice.toUpperCase()}*\n`;
-    text += `┃ ${won ? `✅ Ganaste ₡${formatCoins(amount)}` : `❌ Perdiste ₡${formatCoins(amount)}`}\n`;
-    text += `┃ 💵 Cartera: ₡${formatCoins(user.bolsillo)}\n\n`;
+    text += `┃ ${won ? `✅ Ganaste ${formatMoney(amount, ctx)}` : `❌ Perdiste ${formatMoney(amount, ctx)}`}\n`;
+    text += `┃ 💵 Cartera: ${formatMoney(user.bolsillo, ctx)}\n\n`;
     text += `╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
     return ctx.reply({ text, mentions: [ctx.sender] });
   },

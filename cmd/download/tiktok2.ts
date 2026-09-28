@@ -6,6 +6,12 @@ import {
   formatCount,
 } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 import type {
   CommandContext,
   TikTokSearchResponse,
@@ -20,7 +26,8 @@ export default {
   name: ["dtk", "dtt", "dttv", "doctiktok", "dtkmp4"],
   category: "download",
   description: "Busca y descarga videos de TikTok como documento.",
-  async run({ args, reply, react }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react } = ctx;
     const query = args.join(" ").trim();
     if (!query)
       return reply("⚠️ Proporciona una búsqueda o un enlace válido de TikTok.");
@@ -45,14 +52,16 @@ export default {
       const author =
         data.author?.nickname || data.author?.fullname || "Desconocido";
       const title = data.title || "Video de TikTok";
-      const caption = `╭〔 🎥 ${fytBold("TIKTOK DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Autor")} › ${author}\n┃ > ${fytBold("Vistas")} › ${formatCount(data.stats?.views || data.play_count)}\n┃ > ${fytBold("Likes")} › ${formatCount(data.stats?.likes || data.digg_count)}\n┃ > ${fytBold("Comentarios")} › ${formatCount(data.stats?.comment || data.comment_count)}\n┃ > ${fytBold("Compartidos")} › ${formatCount(data.stats?.share || data.share_count)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const file = await downloadToCache(videoUrl, 180000);
+      const { cost } = await prepareDownloadCharge(ctx, "document", file);
+      const caption = `╭〔 🎥 ${fytBold("TIKTOK DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Autor")} › ${author}\n┃ > ${fytBold("Vistas")} › ${formatCount(data.stats?.views || data.play_count)}\n┃ > ${fytBold("Likes")} › ${formatCount(data.stats?.likes || data.digg_count)}\n┃ > ${fytBold("Comentarios")} › ${formatCount(data.stats?.comment || data.comment_count)}\n┃ > ${fytBold("Compartidos")} › ${formatCount(data.stats?.share || data.share_count)}\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       await reply({
         document: { url: file },
         mimetype: "video/mp4",
         fileName: `${safeFileName(title, "tiktok")}.mp4`,
         caption,
       });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

@@ -5,6 +5,12 @@ import { mkdir, readFile, unlink } from "node:fs/promises";
 import { promisify } from "node:util";
 import { fytBold } from "../../core/socketText.ts";
 import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
+import {
   downloadToCache,
   formatCount,
   pickSearchResult,
@@ -28,7 +34,8 @@ export default {
   name: ["dtta", "dtka", "docttaudio", "dtkmusic", "doctiktokaudio"],
   category: "download",
   description: "Descarga audio de TikTok como documento.",
-  async run({ args, reply, react }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react } = ctx;
     const query = args.join(" ").trim();
     if (!query) return reply("⚠️ Proporciona una búsqueda o enlace de TikTok.");
     if (!ffmpegPath) return reply("❌ FFmpeg no está disponible.");
@@ -81,13 +88,15 @@ export default {
         data.author?.fullname ||
         searchResult?.author?.nickname ||
         "Desconocido";
-      const caption = `╭〔 🎵 ${fytBold("TIKTOK DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Autor")} › ${author}\n┃ > ${fytBold("Vistas")} › ${formatCount(data.stats?.views || data.play_count || searchResult?.views)}\n┃ > ${fytBold("Likes")} › ${formatCount(data.stats?.likes || data.digg_count || searchResult?.likes)}\n┃ > ${fytBold("Comentarios")} › ${formatCount(data.stats?.comment || data.comment_count || searchResult?.comments)}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const { cost } = await prepareDownloadCharge(ctx, "document", output);
+      const caption = `╭〔 🎵 ${fytBold("TIKTOK DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Autor")} › ${author}\n┃ > ${fytBold("Vistas")} › ${formatCount(data.stats?.views || data.play_count || searchResult?.views)}\n┃ > ${fytBold("Likes")} › ${formatCount(data.stats?.likes || data.digg_count || searchResult?.likes)}\n┃ > ${fytBold("Comentarios")} › ${formatCount(data.stats?.comment || data.comment_count || searchResult?.comments)}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       await reply({ text: caption });
       await reply({
         document: await readFile(output),
         mimetype: "audio/mpeg",
         fileName: `${safeFileName(title, "tiktok")}.mp3`,
       });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

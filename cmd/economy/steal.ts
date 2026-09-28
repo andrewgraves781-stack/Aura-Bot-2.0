@@ -1,9 +1,8 @@
 import type { CommandContext } from "../../types/index.d.ts";
-import { cooldownText } from "../../core/economyConfig.ts";
+import { cooldownText, formatMoney } from "../../core/economyConfig.ts";
 import {
   economyTarget,
   economyUser,
-  formatCoins,
   saveEconomy,
 } from "../../core/economyRuntime.ts";
 
@@ -26,7 +25,7 @@ export default {
       );
     if (victim.bolsillo < 500)
       return ctx.reply(
-        "🪵 La cartera de este usuario está vacía o tiene menos de ₡500.",
+        `🪵 La cartera de este usuario está vacía o tiene menos de ${formatMoney(500, ctx)}.`,
       );
     thief.lastSteal = now;
     const success = Math.random() <= 0.4;
@@ -35,15 +34,15 @@ export default {
       const stolen = Math.floor(victim.bolsillo * (Math.random() * 0.25 + 0.1));
       victim.bolsillo -= stolen;
       thief.bolsillo += stolen;
-      text += `┃ ⚔️ ¡Asalto exitoso!\n┃ 💰 Botín conseguido: +₡${formatCoins(stolen)}\n`;
+      text += `┃ ⚔️ ¡Asalto exitoso!\n┃ 💰 Botín conseguido: +${formatMoney(stolen, ctx)}\n`;
     } else {
       const fine = Math.floor(Math.random() * 3001) + 2000;
       thief.bolsillo = Math.max(0, thief.bolsillo - fine);
-      text += `┃ 🚨 ¡El plan falló!\n┃ 💸 Fianza de escape: -₡${formatCoins(fine)}\n`;
+      text += `┃ 🚨 ¡El plan falló!\n┃ 💸 Fianza de escape: -${formatMoney(fine, ctx)}\n`;
     }
     saveEconomy(ctx, ctx.sender, thief);
     saveEconomy(ctx, target, victim);
-    text += `┃ 💵 Tu cartera: ₡${formatCoins(thief.bolsillo)}\n\n╰〔 ⚡ 𝐒𝐘𝐒𝐓𝐄𝐌 〕⬣`;
+    text += `┃ 💵 Tu cartera: ${formatMoney(thief.bolsillo, ctx)}\n\n╰〔 ⚡ 𝐒𝐘𝐒𝐓𝐄𝐌 〕⬣`;
     return ctx.reply({ text, mentions: [ctx.sender, target] });
   },
 };

@@ -1,6 +1,16 @@
 import { fytBold } from "../../core/socketText.ts";
-import { requestJson, safeFileName } from "../../core/downloadUtils.ts";
+import {
+  downloadToCache,
+  requestJson,
+  safeFileName,
+} from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 import type {
   CommandContext,
   YouTubeVideoData,
@@ -15,7 +25,8 @@ export default {
   name: ["dytmp4", "docvideo", "docplayvideo", "docmp4", "dytv", "docplay2"],
   category: "download",
   description: "Descarga videos de YouTube como documento.",
-  async run({ args, reply, react }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react } = ctx;
     const query = args.join(" ").trim();
     if (!query) return reply("⚠️ Proporciona una búsqueda o enlace de video.");
     await react("⏳");
@@ -35,13 +46,16 @@ export default {
       if (!data?.status || !data.datos?.url)
         throw new Error("No se pudo obtener el video.");
       const title = data.titulo || "Video de YouTube";
-      const caption = `╭〔 🎬 ${fytBold("YOUTUBE DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${data.canal || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${data.duracion || "??"}\n┃ > ${fytBold("Tipo")} › Documento MP4\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const file = await downloadToCache(data.datos.url);
+      const { cost } = await prepareDownloadCharge(ctx, "document", file);
+      const caption = `╭〔 🎬 ${fytBold("YOUTUBE DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${data.canal || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${data.duracion || "??"}\n┃ > ${fytBold("Tipo")} › Documento MP4\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       await reply({ text: caption });
       await reply({
-        document: { url: data.datos.url },
+        document: { url: file },
         mimetype: "video/mp4",
         fileName: `${safeFileName(title, "youtube")}.mp4`,
       });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

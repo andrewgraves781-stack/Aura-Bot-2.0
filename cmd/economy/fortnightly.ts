@@ -1,9 +1,9 @@
 import type { CommandContext } from "../../types/index.d.ts";
 import {
   cooldownText,
-  formatCoins,
   getEconomyUser,
   setEconomyUser,
+  formatMoney,
 } from "../../core/economyConfig.ts";
 import { fytBold } from "./../../core/socketText.ts";
 
@@ -30,10 +30,14 @@ export default {
       user.lastFortnightly && now - user.lastFortnightly > gracePeriod
         ? 1
         : (user.fortnightlyStreak || 0) + 1;
-    const baseReward = Math.floor(Math.random() * 5001) + 10000;
-    const streakBonus = Math.min(user.fortnightlyStreak - 1, 6) * 1500;
+
+    const baseReward = 200000;
+    const streakBonus =
+      user.fortnightlyStreak > 1
+        ? 25000 * Math.pow(2, Math.min(user.fortnightlyStreak - 2, 10))
+        : 0;
     const totalReward = baseReward + streakBonus;
-    user.bolsillo += totalReward;
+    user.bolsillo = Number(user.bolsillo || 0) + totalReward;
     user.lastFortnightly = now;
     setEconomyUser(ctx.from, ctx.sender, user);
 
@@ -41,10 +45,10 @@ export default {
     text += `┃ 🔥 𝐑𝐀𝐂𝐇𝐀: *${user.fortnightlyStreak} Quincenas*\n`;
     text += `╰━━━━━━━━━━━━⬣\n\n`;
     text += `┃ 👋 Hola *@${ctx.sender.split("@")[0]}*\n`;
-    text += `┃ 🎉 Base: ₡${formatCoins(baseReward)}\n`;
-    text += `┃ ✨ Bono de Racha: +₡${formatCoins(streakBonus)}\n`;
-    text += `┃ 💰 Total Ganado: *₡${formatCoins(totalReward)}*\n`;
-    text += `┃ 💵 Saldo actual: ₡${formatCoins(user.bolsillo)}\n\n`;
+    text += `┃ 🎉 Base: ${formatMoney(baseReward, ctx)}\n`;
+    text += `┃ ✨ Bono Racha: +${formatMoney(streakBonus, ctx)}\n`;
+    text += `┃ 💰 Total Ganado: *${formatMoney(totalReward, ctx)}*\n`;
+    text += `┃ 💵 Saldo actual: ${formatMoney(user.bolsillo, ctx)}\n\n`;
     text += `╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
     return ctx.reply({ text, mentions: [ctx.sender] });
   },

@@ -6,6 +6,12 @@ import {
 } from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { sendDownloadPreview } from "../../core/downloadPreview.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 import type {
   CommandContext,
   YouTubeVideoData,
@@ -34,7 +40,8 @@ export default {
   name: ["ytmp4", "video", "playvideo", "mp4", "ytv", "play2"],
   category: "download",
   description: "Busca y descarga video de YouTube.",
-  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react, sock, from, msg, sender } = ctx;
     const query = args.join(" ").trim();
     if (!query) return reply("⚠️ Proporciona el nombre o enlace de un video.");
     await react("⏳");
@@ -48,7 +55,9 @@ export default {
       if (!data?.status || !data?.datos?.url)
         throw new Error("La API no pudo procesar el video.");
       const title = data.titulo || "Video de YouTube";
-      const caption = `╭〔 🎬 ${fytBold("YOUTUBE VIDEO")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${data.canal || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${data.duracion || "??"}\n┃ > ${fytBold("Tamaño")} › ${data.datos.tamaño || "??"}\n┃ > ${fytBold("Tipo")} › Video MP4\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Enviando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const file = await downloadToCache(data.datos.url);
+      const { cost } = await prepareDownloadCharge(ctx, "video", file);
+      const caption = `╭〔 🎬 ${fytBold("YOUTUBE VIDEO")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${data.canal || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${data.duracion || "??"}\n┃ > ${fytBold("Tamaño")} › ${data.datos.tamaño || "??"}\n┃ > ${fytBold("Tipo")} › Video MP4\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Enviando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const hasPreview = data.miniatura
         ? await sendDownloadPreview({
             sock,
@@ -63,12 +72,12 @@ export default {
           })
         : false;
       if (!hasPreview) await reply({ text: caption });
-      const file = await downloadToCache(data.datos.url);
       await reply({
         video: { url: file },
         mimetype: "video/mp4",
         fileName: `${safeFileName(title, "youtube")}.mp4`,
       });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

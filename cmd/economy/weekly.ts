@@ -1,9 +1,9 @@
 import type { CommandContext } from "../../types/index.d.ts";
 import {
   cooldownText,
-  formatCoins,
   getEconomyUser,
   setEconomyUser,
+  formatMoney,
 } from "../../core/economyConfig.ts";
 import { fytBold } from "../../core/socketText.ts";
 
@@ -30,8 +30,12 @@ export default {
       user.lastWeekly && now - user.lastWeekly > gracePeriod
         ? 1
         : (user.weeklyStreak || 0) + 1;
-    const baseReward = (Math.floor(Math.random() * 2000) + 3000) * 3;
-    const streakBonus = Math.min(user.weeklyStreak - 1, 8) * 1500;
+
+    const baseReward = 100000;
+    const streakBonus =
+      user.weeklyStreak > 1
+        ? 12500 * Math.pow(2, Math.min(user.weeklyStreak - 2, 10))
+        : 0;
     const totalReward = baseReward + streakBonus;
     user.bolsillo = Number(user.bolsillo || 0) + totalReward;
     user.lastWeekly = now;
@@ -41,10 +45,10 @@ export default {
     text += `┃ 🔥 ${fytBold("RACHA")}: *${user.weeklyStreak} Semanas*\n`;
     text += `╰━━━━━━━━━━━━⬣\n\n`;
     text += `┃ 👋 Hola *@${ctx.sender.split("@")[0]}*\n`;
-    text += `┃ 🎉 Base (x3): ₡${formatCoins(baseReward)}\n`;
-    text += `┃ ✨ Bono de Racha: +₡${formatCoins(streakBonus)}\n`;
-    text += `┃ 💰 Total Ganado: *₡${formatCoins(totalReward)}*\n`;
-    text += `┃ 💵 Saldo actual: ₡${formatCoins(user.bolsillo)}\n\n`;
+    text += `┃ 🎉 Base: ${formatMoney(baseReward, ctx)}\n`;
+    text += `┃ ✨ Bono Racha: +${formatMoney(streakBonus, ctx)}\n`;
+    text += `┃ 💰 Total Ganado: *${formatMoney(totalReward, ctx)}*\n`;
+    text += `┃ 💵 Saldo actual: ${formatMoney(user.bolsillo, ctx)}\n\n`;
     text += `┃ ⏳ Próxima recompensa: En *7 días*\n\n`;
     text += `╰〔 ⚡ ${fytBold("AURA REED")} 〕⬣`;
     return ctx.reply({ text, mentions: [ctx.sender] });

@@ -34,8 +34,10 @@ export interface CooldownRows {
 }
 
 export interface EconomyUser {
-  bolsillo?: number;
-  banco?: number;
+  bolsillo: number;
+  banco: number;
+  coins: number;
+  bank: number;
   xp?: number;
   level?: number;
   aura?: number;

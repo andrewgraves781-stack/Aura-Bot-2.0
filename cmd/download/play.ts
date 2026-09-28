@@ -16,6 +16,12 @@ import { fytBold } from "../../core/socketText.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { createLinkPreviewWithoutChannel } from "../../core/LinkPreview.ts";
 import { downloadToCache } from "../../core/downloadUtils.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 
 const API_KEY = DL_CONFIG.alya.API_KEY;
 const BASE_URL = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
@@ -136,7 +142,8 @@ export default {
   name: ["play", "ytmp3", "ytaudio", "playaudio", "playmp3", "ytmusic", "yta"],
   description: "Busca y descarga audio de YouTube.",
   category: "download",
-  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react, sock, from, msg, sender } = ctx;
     const query = args.join(" ").trim();
     if (!query)
       return reply(
@@ -169,6 +176,9 @@ export default {
       const youtubeUrl = videoId
         ? `https://youtu.be/${videoId}`
         : result.url || finalUrl;
+      if (!audio.dl) throw new Error("No se pudo obtener el audio.");
+      const file = await downloadToCache(audio.dl);
+      const { cost } = await prepareDownloadCharge(ctx, "audio", file);
       let caption = `╭〔 🎵 ${fytBold("YOUTUBE PLAY")} 〕━⬣\n\n`;
       caption += `┃ ➥ ${fytBold(title)}\n\n`;
       caption += `┣━━━━━━━━━━━━⬣\n`;
@@ -176,6 +186,7 @@ export default {
       caption += `┃ > ${fytBold("Duración")} › ${duration}\n`;
       caption += `┃ > ${fytBold("Vistas")} › ${fomatViewers(views)}\n`;
       caption += `┃ > ${fytBold("Calidad")} › ${quality}\n`;
+      caption += `┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n`;
       caption += `┃ > ${fytBold("Url")} › ${youtubeUrl}\n`;
       caption += `┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando audio...\n`;
       caption += `╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
@@ -216,13 +227,13 @@ export default {
       } else {
         await reply({ text: caption });
       }
-      await react("✅");
-
-      return reply({
-        audio: { url: audio.dl },
+      await reply({
+        audio: { url: file },
         mimetype: "audio/mpeg",
         fileName: `${title.replace(/[<>:"/\\|?*]/g, "").slice(0, 100) || "youtube"}.mp3`,
       });
+      confirmDownloadCharge(ctx);
+      await react("✅");
     } catch (error: unknown) {
       await react("❌");
       return reply({

@@ -1,12 +1,14 @@
 import type { CommandContext } from "../../types/index.d.ts";
-import { getGroupEconomyUsers, formatCoins } from "../../core/economyConfig.ts";
-import { db } from "../../dbController/db.ts";
+import {
+  getGroupEconomyUsers,
+  formatMoney,
+} from "../../core/economyConfig.ts";
+import { db } from "../../core/db.ts";
 
 export default {
   name: ["baltop", "topbal", "topcoins"],
   category: "economy",
-  description: "Muestra quién tiene más monedas en el grupo.",
-  groupOnly: true,
+  description: "Muestra el ranking de usuarios con más monedas.",
   async run(ctx: CommandContext) {
     const pageSize = 10;
     const requestedPage = Number.parseInt(String(ctx.args?.[0] || "1"), 10);
@@ -78,7 +80,7 @@ export default {
     let text = `╭〔 💎 𝐁𝐀𝐋𝐀𝐍𝐂𝐄 𝐓𝐎𝐏 💎 〕⬣\n┃ 🏆 𝐑𝐀𝐍𝐊𝐈𝐍𝐆 𝐃𝐄 𝐌𝐎𝐍𝐄𝐃𝐀𝐒\n┃ 📄 Página ${page}/${totalPages}\n╰━━━━━━━━━━━━⬣\n\n`;
     pageRows.forEach((row, index) => {
       const position = (page - 1) * pageSize + index;
-      text += `┃ ${position < 3 ? ["🥇", "🥈", "🥉"][position] : "🎖️"} ${row.username}\n┃ ₡ ${formatCoins(row.total)} AuraCoins\n\n`;
+      text += `┃ ${position < 3 ? ["🥇", "🥈", "🥉"][position] : "🎖️"} ${row.username}\n┃ ${formatMoney(row.total, ctx)}\n\n`;
     });
     text += `╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐄𝐂𝐎𝐍𝐎𝐌𝐘 ⚡ 〕⬣`;
     return ctx.reply(text);

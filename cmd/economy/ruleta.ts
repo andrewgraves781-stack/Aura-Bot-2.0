@@ -2,8 +2,8 @@ import type { CommandContext } from "../../types/index.d.ts";
 import {
   amountArg,
   economyUser,
-  formatCoins,
   saveEconomy,
+  formatMoney,
 } from "../../core/economyRuntime.ts";
 
 export default {
@@ -18,7 +18,7 @@ export default {
       return ctx.reply("⚠️ Usa: *.ruleta [cantidad] [red|black|green]*");
     if (user.bolsillo < amount)
       return ctx.reply(
-        `❌ No tienes suficientes monedas. Tienes *₡${formatCoins(user.bolsillo)}*.`,
+        `❌ No tienes suficientes monedas. Tienes *${formatMoney(user.bolsillo, ctx)}*.`,
       );
     const roll = Math.random() * 100;
     const result = roll < 40 ? "red" : roll < 80 ? "black" : "green";
@@ -32,7 +32,7 @@ export default {
       green: "🟢 GREEN",
     };
     let text = `╭〔 🎡 𝐑𝐔𝐋𝐄𝐓𝐀 〕⬣\n┃ 🎰 𝐑𝐄𝐒𝐔𝐋𝐓𝐀𝐃𝐎\n╰━━━━━━━━━━━━⬣\n\n`;
-    text += `┃ 🎡 Resultado: ${labels[result]}\n┃ 🎯 Apostaste: ${labels[color]}\n┃ ${winnings ? `✅ Ganancia: ₡${formatCoins(winnings)}` : `❌ Pérdida: ₡${formatCoins(amount)}`}\n┃ 💵 Cartera: ₡${formatCoins(user.bolsillo)}\n\n╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
+    text += `┃ 🎡 Resultado: ${labels[result]}\n┃ 🎯 Apostaste: ${labels[color]}\n┃ ${winnings ? `✅ Ganancia: ${formatMoney(winnings, ctx)}` : `❌ Pérdida: ${formatMoney(amount, ctx)}`}\n┃ 💵 Cartera: ${formatMoney(user.bolsillo, ctx)}\n\n╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
     return ctx.reply({ text, mentions: [ctx.sender] });
   },
 };

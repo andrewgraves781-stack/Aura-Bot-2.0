@@ -6,7 +6,7 @@ import { connectToWhatsApp } from "./core/conection.ts";
 import { startSavedSubBots } from "./core/subbotManager.ts";
 import { loadPlugins, watchPlugins } from "./core/cmdLoader.ts";
 import { displayBanner, logInfo, connectionLog } from "./core/logger.ts";
-import { checkpointDb } from "./dbController/db.ts";
+import { checkpointDb } from "./core/db.ts";
 
 // Desactivar caché de memoria nativa de sharp (libvips)
 sharp.cache(false);

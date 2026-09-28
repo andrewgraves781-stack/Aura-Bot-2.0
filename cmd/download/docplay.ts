@@ -1,7 +1,17 @@
 import { fytBold } from "../../core/socketText.ts";
-import { requestJson, safeFileName } from "../../core/downloadUtils.ts";
+import {
+  downloadToCache,
+  requestJson,
+  safeFileName,
+} from "../../core/downloadUtils.ts";
 import { DL_CONFIG } from "../../config.ts";
 import { sendDownloadPreview } from "../../core/downloadPreview.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 import type {
   CommandContext,
   YouTubeSearchResponse,
@@ -24,7 +34,8 @@ export default {
   ],
   category: "download",
   description: "Descarga audio de YouTube como documento.",
-  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react, sock, from, msg, sender } = ctx;
     const query = args.join(" ").trim();
     if (!query)
       return reply("⚠️ Proporciona una búsqueda o enlace de YouTube.");
@@ -45,7 +56,9 @@ export default {
         throw new Error("No se pudo obtener el audio.");
       const info = data.data;
       const title = info.title || "Audio de YouTube";
-      const caption = `╭〔 🎵 ${fytBold("YOUTUBE DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${info.author || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${info.duration || "??"}\n┃ > ${fytBold("Calidad")} › ${info.quality || "128k"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const file = await downloadToCache(info.dl);
+      const { cost } = await prepareDownloadCharge(ctx, "document", file);
+      const caption = `╭〔 🎵 ${fytBold("YOUTUBE DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${info.author || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${info.duration || "??"}\n┃ > ${fytBold("Calidad")} › ${info.quality || "128k"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const videoId = url.match(YT_ID)?.[1];
       const thumbnail = videoId
         ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
@@ -65,10 +78,11 @@ export default {
         : false;
       if (!hasPreview) await reply({ text: caption });
       await reply({
-        document: { url: info.dl },
+        document: { url: file },
         mimetype: "audio/mpeg",
         fileName: `${safeFileName(title, "youtube")}.mp3`,
       });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

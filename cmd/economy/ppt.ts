@@ -1,9 +1,11 @@
 import type { CommandContext } from "../../types/index.d.ts";
-import { cooldownText } from "../../core/economyConfig.ts";
+import {
+  cooldownText,
+} from "../../core/economyConfig.ts";
 import {
   economyUser,
-  formatCoins,
   saveEconomy,
+  formatMoney,
 } from "../../core/economyRuntime.ts";
 
 const options = ["piedra", "papel", "tijera"];
@@ -43,10 +45,10 @@ export default {
       choice === bot
         ? "🤝 ¡Empate!"
         : won
-          ? `🎉 ¡Ganaste! +₡${formatCoins(reward)}`
+          ? `🎉 ¡Ganaste! +${formatMoney(reward, ctx)}`
           : "❌ ¡Perdiste!";
     let text = `╭〔 🎮 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣\n┃ 𝐏𝐈𝐄𝐃𝐑𝐀, 𝐏𝐀𝐏𝐄𝐋 𝐎 𝐓𝐈𝐉𝐄𝐑𝐀\n╰━━━━━━━━━━━━⬣\n\n`;
-    text += `┃ 👤 Tu elección: ${emojis[choice]} *${choice.toUpperCase()}*\n┃ 🤖 Aura Reed: ${emojis[bot]} *${bot.toUpperCase()}*\n\n┃ ${result}\n┃ 💵 Cartera: ₡${formatCoins(user.bolsillo)}\n\n╰〔 ⚡ 𝐒𝐘𝐒𝐓𝐄𝐌 〕⬣`;
+    text += `┃ 👤 Tu elección: ${emojis[choice]} *${choice.toUpperCase()}*\n┃ 🤖 Aura Reed: ${emojis[bot]} *${bot.toUpperCase()}*\n\n┃ ${result}\n┃ 💵 Cartera: ${formatMoney(user.bolsillo, ctx)}\n\n╰〔 ⚡ 𝐒𝐘𝐒𝐓𝐄𝐌 〕⬣`;
     return ctx.reply({ text, mentions: [ctx.sender] });
   },
 };

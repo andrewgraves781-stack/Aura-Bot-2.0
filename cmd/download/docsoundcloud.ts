@@ -5,9 +5,15 @@ import type {
   SoundCloudSearchResponse,
 } from "../../types/index.d.ts";
 import { fytBold } from "../../core/socketText.ts";
-import { safeFileName } from "../../core/downloadUtils.ts";
+import { downloadToCache, safeFileName } from "../../core/downloadUtils.ts";
 import { request } from "undici";
 import { sendDownloadPreview } from "../../core/downloadPreview.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 
 let cachedClientId = "";
 let cachedAt = 0;
@@ -56,7 +62,8 @@ export default {
   name: ["dscplay", "dscdl", "dsc", "docsoundcloud"],
   category: "download",
   description: "Descarga SoundCloud como documento MP3.",
-  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react, sock, from, msg, sender } = ctx;
     const query = args.join(" ").trim();
     if (!query)
       return reply("⚠️ Proporciona una búsqueda o enlace de SoundCloud.");
@@ -86,7 +93,9 @@ export default {
       );
       if (!stream?.url) throw new Error("SoundCloud no devolvió el audio.");
       const title = track.title || "SoundCloud";
-      const caption = `╭〔 🎵 ${fytBold("SOUNDCLOUD DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${track.user?.username || "N/A"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const file = await downloadToCache(stream.url);
+      const { cost } = await prepareDownloadCharge(ctx, "document", file);
+      const caption = `╭〔 🎵 ${fytBold("SOUNDCLOUD DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${track.user?.username || "N/A"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const thumbnail = track.artwork_url?.replace("large", "t500x500");
       const hasPreview = thumbnail
         ? await sendDownloadPreview({
@@ -103,10 +112,11 @@ export default {
         : false;
       if (!hasPreview) await reply({ text: caption });
       await reply({
-        document: { url: stream.url },
+        document: { url: file },
         mimetype: "audio/mpeg",
         fileName: `${safeFileName(title, "soundcloud")}.mp3`,
       });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

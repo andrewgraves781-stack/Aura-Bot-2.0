@@ -1,8 +1,8 @@
 import {
   addEconomyXp,
   economyUser,
-  formatCoins,
   saveEconomy,
+  formatMoney,
 } from "./economyRuntime.ts";
 import { cooldownText } from "./economyConfig.ts";
 import { economyTexts } from "./economyTexts.ts";
@@ -67,11 +67,11 @@ export function createEconomyActivity(options: ActivityOptions) {
       const failMessage = failTexts?.length ? failTexts : options.fail;
 
       let text = `╭〔 ${options.icon} 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣\n┃ ${options.title}\n╰━━━━━━━━━━━━⬣\n\n`;
-      text += `┃ 👋 Hola *@${ctx.sender.split("@")[0]}*\n┃ ✨ XP Ganado: +${xp}\n`;
+      text += `┃ 👋 Hola *@${ctx.sender.split("@")[0]}*\n┃ ✨ Aura Ganado: +${xp}\n`;
       text += success
-        ? `┃ ${successMessage[Math.floor(Math.random() * successMessage.length)]} *₡${formatCoins(reward)}*\n`
+        ? `┃ ${successMessage[Math.floor(Math.random() * successMessage.length)]} *${formatMoney(reward, ctx)}*\n`
         : `┃ ${failMessage[Math.floor(Math.random() * failMessage.length)]}\n`;
-      text += `┃ 💵 Saldo actual: ₡${formatCoins(user.bolsillo)}\n\n╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
+      text += `┃ 💵 Saldo actual: ${formatMoney(user.bolsillo, ctx)}\n\n╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
       return ctx.reply({ text, mentions: [ctx.sender] });
     },
   };

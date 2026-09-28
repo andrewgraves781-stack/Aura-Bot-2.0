@@ -11,7 +11,7 @@ import type {
   UserDbRow,
   GroupDbRow,
   BotDbRow,
-} from "../types/index.d.ts";
+} from "../types/index";
 
 export type {
   DatabaseUser,
@@ -46,6 +46,18 @@ db_instance.exec(`
     role TEXT DEFAULT 'user',
     is_banned INTEGER DEFAULT 0,
     self INTEGER DEFAULT 0,
+    coins INTEGER DEFAULT 100000,
+    bank INTEGER DEFAULT 10000,
+    marriage_to TEXT DEFAULT NULL,
+    name TEXT DEFAULT NULL,
+    genre TEXT DEFAULT 'Unknown',
+    birth_date TEXT DEFAULT NULL,
+    description TEXT DEFAULT 'Sin descripcion',
+    aura_points INTEGER DEFAULT 0,
+    aura_level INTEGER DEFAULT 1,
+    stickerPackAuthor TEXT DEFAULT NULL,
+    stickerPackName TEXT DEFAULT NULL,
+    cmdsUsedCount INTEGER DEFAULT 0,
     data TEXT DEFAULT '{}'
   );
 
@@ -59,8 +71,11 @@ db_instance.exec(`
     antiSpam INTEGER DEFAULT 0,
     antiStatus INTEGER DEFAULT 0,
     onlyAdmin INTEGER DEFAULT 0,
+    botOnline INTEGER DEFAULT 1,
     prefix TEXT DEFAULT NULL,
     topMsgUsers TEXT DEFAULT '[]',
+    topCmdUsers TEXT DEFAULT '[]',
+    userWarns TEXT DEFAULT '{}',
     catBlocked TEXT DEFAULT '["nsfw"]',
     data TEXT DEFAULT '{}'
   );
@@ -70,12 +85,15 @@ db_instance.exec(`
     bot_id TEXT,
     bot_name TEXT,
     phone_number TEXT,
+    isPremBot INTEGER DEFAULT 0,
     lid TEXT,
     groups TEXT DEFAULT '[]',
     isMain INTEGER DEFAULT 0,
     status TEXT DEFAULT 'offline',
     modPrefix TEXT DEFAULT NULL,
     modSelf INTEGER DEFAULT 0,
+    currency TEXT DEFAULT 'AuraCoins',
+    currencySymbol TEXT DEFAULT '₡',
     data TEXT DEFAULT '{}'
   );
 `);
@@ -84,6 +102,12 @@ for (const column of [
   ["phone_number", "TEXT"],
   ["lid", "TEXT"],
   ["groups", "TEXT DEFAULT '[]'"],
+  ["genre", "TEXT DEFAULT 'Unknown'"],
+  ["aura_points", "INTEGER DEFAULT 0"],
+  ["aura_level", "INTEGER DEFAULT 1"],
+  ["stickerPackAuthor", "TEXT DEFAULT NULL"],
+  ["stickerPackName", "TEXT DEFAULT NULL"],
+  ["botOnline", "INTEGER DEFAULT 1"],
 ] as const) {
   const exists = db_instance
     .prepare("SELECT 1 FROM pragma_table_info('bots') WHERE name = ?")
@@ -98,8 +122,11 @@ for (const [table, column, definition] of [
   ["groups", "onlyAdmin", "INTEGER DEFAULT 0"],
   ["groups", "topMsgUsers", "TEXT DEFAULT '[]'"],
   ["groups", "catBlocked", "TEXT DEFAULT '[\"nsfw\"]'"],
+  ["groups", "botOnline", "INTEGER DEFAULT 1"],
   ["bots", "modPrefix", "TEXT"],
   ["bots", "modSelf", "INTEGER DEFAULT 0"],
+  ["bots", "currency", "TEXT DEFAULT 'AuraCoins'"],
+  ["bots", "currencySymbol", "TEXT DEFAULT '₡'"],
 ] as const) {
   const exists = db_instance
     .prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`)
@@ -113,16 +140,16 @@ const hierarchy = ["user", "premium", "mod", "coowner", "owner"] as const;
 const stmts = {
   getUser: db_instance.prepare("SELECT * FROM users WHERE jid = ?"),
   insertUser: db_instance.prepare(
-    "INSERT INTO users (jid, lid, username, phone_number, role, is_banned, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    "INSERT OR IGNORE INTO users (jid, lid, username, phone_number, role, is_banned, coins, bank, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ),
   updateUser: db_instance.prepare(
-    "UPDATE users SET lid = ?, username = ?, phone_number = ?, role = ?, is_banned = ?, data = ? WHERE jid = ?",
+    "UPDATE users SET lid = ?, username = ?, phone_number = ?, role = ?, is_banned = ?, coins = ?, bank = ?, data = ? WHERE jid = ?",
   ),
   updateUserByLid: db_instance.prepare(
-    "UPDATE users SET username = ?, phone_number = ?, role = ?, is_banned = ?, data = ? WHERE lid = ?",
+    "UPDATE users SET username = ?, phone_number = ?, role = ?, is_banned = ?, coins = ?, bank = ?, data = ? WHERE lid = ?",
   ),
   getAllUsers: db_instance.prepare(
-    "SELECT jid, lid, username, phone_number, role, is_banned, data FROM users",
+    "SELECT jid, lid, username, phone_number, role, is_banned, coins, bank, data FROM users",
   ),
 
   getGroup: db_instance.prepare("SELECT * FROM groups WHERE jid = ?"),
@@ -138,10 +165,10 @@ const stmts = {
 
   getBot: db_instance.prepare("SELECT * FROM bots WHERE jid = ?"),
   insertBot: db_instance.prepare(
-    "INSERT INTO bots (jid, bot_id, bot_name, phone_number, lid, groups, isMain, status, modPrefix, modSelf, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO bots (jid, bot_id, bot_name, phone_number, lid, groups, isMain, status, modPrefix, modSelf, currency, currencySymbol, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ),
   updateBot: db_instance.prepare(
-    "UPDATE bots SET bot_id = ?, bot_name = ?, phone_number = ?, lid = ?, groups = ?, isMain = ?, status = ?, modPrefix = ?, modSelf = ?, data = ? WHERE jid = ?",
+    "UPDATE bots SET bot_id = ?, bot_name = ?, phone_number = ?, lid = ?, groups = ?, isMain = ?, status = ?, modPrefix = ?, modSelf = ?, currency = ?, currencySymbol = ?, data = ? WHERE jid = ?",
   ),
   getAllBots: db_instance.prepare(
     "SELECT jid, bot_id, bot_name, phone_number, lid, groups, isMain, status, modPrefix, modSelf, data FROM bots",
@@ -238,22 +265,31 @@ function getUser(input: string): DatabaseUser {
       data: {},
     };
 
-    stmts.insertUser.run(
-      defaultUser.jid,
-      defaultUser.lid,
-      defaultUser.username,
-      defaultUser.phone_number,
-      defaultUser.role,
-      defaultUser.is_banned,
-      JSON.stringify(defaultUser.data),
-    );
+    try {
+      stmts.insertUser.run(
+        defaultUser.jid,
+        defaultUser.lid,
+        defaultUser.username,
+        defaultUser.phone_number,
+        defaultUser.role,
+        defaultUser.is_banned,
+        100000,
+        10000,
+        JSON.stringify(defaultUser.data),
+      );
+    } catch {
+      // Ignora errores si la fila fue creada concurrentemente
+    }
 
-    return defaultUser;
+    return { ...defaultUser, coins: 100000, bank: 10000, bolsillo: 100000, banco: 10000 };
   }
 
   const jsonData = safeJson<Record<string, unknown>>(
     row.data as string | undefined,
   );
+  const coins = Number(row.coins ?? jsonData.coins ?? jsonData.bolsillo ?? 100000);
+  const bank = Number(row.bank ?? jsonData.bank ?? jsonData.banco ?? 10000);
+
   return {
     ...jsonData,
     jid: (row.jid !== undefined ? row.jid : (jsonData.jid ?? key)) as
@@ -267,6 +303,10 @@ function getUser(input: string): DatabaseUser {
       : (jsonData.phone_number ?? key)) as string | null,
     role: (row.role ?? jsonData.role ?? "user") as string,
     is_banned: Number(row.is_banned ?? jsonData.is_banned ?? 0),
+    coins,
+    bank,
+    bolsillo: coins,
+    banco: bank,
     data: jsonData,
   };
 }
@@ -381,6 +421,8 @@ function getBot(jid: string): DatabaseBot {
       status: "offline",
       modPrefix: null,
       modSelf: 0,
+      currency: "AuraCoins",
+      currencySymbol: "₡",
       data: {},
     };
 
@@ -395,6 +437,8 @@ function getBot(jid: string): DatabaseBot {
       defaultBot.status,
       defaultBot.modPrefix,
       defaultBot.modSelf,
+      "AuraCoins",
+      "₡",
       JSON.stringify(defaultBot.data),
     );
 
@@ -419,6 +463,10 @@ function getBot(jid: string): DatabaseBot {
     status: (row.status ?? jsonData.status ?? "offline") as string,
     modPrefix: (row.modPrefix ?? jsonData.modPrefix ?? null) as string | null,
     modSelf: Number(row.modSelf ?? jsonData.modSelf ?? 0),
+    currency: (row.currency ?? jsonData.currency ?? "AuraCoins") as string,
+    currencySymbol: (row.currencySymbol ??
+      jsonData.currencySymbol ??
+      "₡") as string,
     data: jsonData,
   };
 }
@@ -453,18 +501,30 @@ export const db: IDatabase = {
     delete payload.data;
 
     const row = getUserRow(rawJid ?? key, rawLid);
+    const coins = Number(
+      merged.coins ?? merged.bolsillo ?? row?.coins ?? 100000,
+    );
+    const bank = Number(
+      merged.bank ?? merged.banco ?? row?.bank ?? 10000,
+    );
 
     if (!row) {
-      stmts.insertUser.run(
-        rawJid,
-        rawLid || merged.lid || null,
-        merged.username ?? null,
-        isLidOnly ? null : (merged.phone_number ?? key),
-        merged.role ?? "user",
-        Number(Boolean(merged.is_banned ?? 0)),
-        JSON.stringify(payload),
-      );
-      return;
+      try {
+        stmts.insertUser.run(
+          rawJid,
+          rawLid || merged.lid || null,
+          merged.username ?? null,
+          isLidOnly ? null : (merged.phone_number ?? key),
+          merged.role ?? "user",
+          Number(Boolean(merged.is_banned ?? 0)),
+          coins,
+          bank,
+          JSON.stringify(payload),
+        );
+        return;
+      } catch {
+        // Si ya existía, continuará al flujo de actualización más abajo
+      }
     }
 
     const storedLid = rawLid || row.lid || merged.lid || null;
@@ -477,6 +537,8 @@ export const db: IDatabase = {
         phoneNumber,
         merged.role ?? row.role ?? "user",
         Number(Boolean(merged.is_banned ?? row.is_banned ?? 0)),
+        coins,
+        bank,
         JSON.stringify(payload),
         storedLid,
       );
@@ -487,6 +549,8 @@ export const db: IDatabase = {
         phoneNumber,
         merged.role ?? row.role ?? "user",
         Number(Boolean(merged.is_banned ?? row.is_banned ?? 0)),
+        coins,
+        bank,
         JSON.stringify(payload),
         row.jid ?? key,
       );
@@ -575,6 +639,13 @@ export const db: IDatabase = {
     delete payload.data;
 
     const row = stmts.getBot.get(key) as BotDbRow | undefined;
+    const currency =
+      String(merged.currency ?? row?.currency ?? "AuraCoins").trim() ||
+      "AuraCoins";
+    const currencySymbol =
+      String(merged.currencySymbol ?? row?.currencySymbol ?? "₡").trim() || "₡";
+    payload.currency = currency;
+    payload.currencySymbol = currencySymbol;
     if (!row) {
       stmts.insertBot.run(
         key,
@@ -587,6 +658,8 @@ export const db: IDatabase = {
         merged.status ?? "offline",
         merged.modPrefix ?? null,
         Number(Boolean(merged.modSelf ?? 0)),
+        currency,
+        currencySymbol,
         JSON.stringify(payload),
       );
       return;
@@ -608,6 +681,8 @@ export const db: IDatabase = {
         ? merged.modPrefix
         : (row.modPrefix ?? null),
       Number(Boolean(merged.modSelf ?? row.modSelf ?? 0)),
+      currency,
+      currencySymbol,
       JSON.stringify(payload),
       key,
     );
@@ -670,6 +745,12 @@ export const db: IDatabase = {
       const jsonData = safeJson<Record<string, unknown>>(
         row.data as string | undefined,
       );
+      const coins = Number(
+        row.coins ?? jsonData.coins ?? jsonData.bolsillo ?? 100000,
+      );
+      const bank = Number(
+        row.bank ?? jsonData.bank ?? jsonData.banco ?? 10000,
+      );
       return {
         jid: (row.jid ?? jsonData.jid ?? null) as string | null,
         ...jsonData,
@@ -679,6 +760,10 @@ export const db: IDatabase = {
           string | null,
         role: (row.role ?? jsonData.role ?? "user") as string,
         is_banned: Number(row.is_banned ?? jsonData.is_banned ?? 0),
+        coins,
+        bank,
+        bolsillo: coins,
+        banco: bank,
       };
     });
   },
@@ -706,6 +791,10 @@ export const db: IDatabase = {
         modPrefix: (row.modPrefix ?? jsonData.modPrefix ?? null) as
           string | null,
         modSelf: Number(row.modSelf ?? jsonData.modSelf ?? 0),
+        currency: (row.currency ?? jsonData.currency ?? "AuraCoins") as string,
+        currencySymbol: (row.currencySymbol ??
+          jsonData.currencySymbol ??
+          "₡") as string,
       };
     });
   },

@@ -40,6 +40,14 @@ export async function requestJson<T = Record<string, unknown>>(
 
 const CACHE_DIR = path.resolve(process.env.GLOBAL_CUSTOM_TMP || "./cache");
 
+export async function getFileBytes(filePath: string): Promise<number> {
+  const info = await stat(filePath);
+  if (!Number.isFinite(info.size) || info.size <= 0) {
+    throw new Error("El archivo descargado está vacío.");
+  }
+  return info.size;
+}
+
 export async function downloadToCache(
   url: string,
   timeout = 180000,
@@ -168,7 +176,7 @@ export function formatCount(value: unknown): string {
   if (numero >= 1e6) {
     return `${(numero / 1e6).toFixed(1)}M`;
   }
-  if (numero >= 1e3) {
+  if (numero >= 1e4) {
     return `${(numero / 1e3).toFixed(1)}K`;
   }
   return numero.toString();

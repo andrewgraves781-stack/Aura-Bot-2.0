@@ -14,7 +14,7 @@ import { Boom } from "@hapi/boom";
 import { handleMessage } from "../handler.ts";
 import { getPlugins } from "./cmdLoader.ts";
 import { connectionLog, pairingLog } from "./logger.ts";
-import { db } from "../dbController/db.ts";
+import { db } from "./db.ts";
 import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import { handleAntilink, handleGroupCall } from "./groupModeration.ts";
 

@@ -3,8 +3,8 @@ import {
   amountArg,
   economyTarget,
   economyUser,
-  formatCoins,
   saveEconomy,
+  formatMoney,
 } from "../../core/economyRuntime.ts";
 
 export default {
@@ -22,7 +22,7 @@ export default {
       return ctx.reply("⚠️ Cantidad inválida. Ejemplo: *.pay 100 @usuario*");
     if (sender.bolsillo < amount)
       return ctx.reply(
-        `❌ No tienes suficientes monedas. Tienes *₡${formatCoins(sender.bolsillo)}*.`,
+        `❌ No tienes suficientes monedas. Tienes *${formatMoney(sender.bolsillo, ctx)}*.`,
       );
     const receiver = economyUser(ctx, target);
     sender.bolsillo -= amount;
@@ -30,7 +30,7 @@ export default {
     saveEconomy(ctx, ctx.sender, sender);
     saveEconomy(ctx, target, receiver);
     let text = `╭〔 💸 𝐓𝐑𝐀𝐍𝐒𝐅𝐄𝐑𝐄𝐍𝐂𝐈𝐀 〕⬣\n┃ ✅ 𝐏𝐀𝐆𝐎 𝐑𝐄𝐀𝐋𝐈𝐙𝐀𝐃𝐎\n╰━━━━━━━━━━━━⬣\n\n`;
-    text += `┃ 📤 De: *@${ctx.sender.split("@")[0]}*\n┃ 📥 Para: @${target.split("@")[0]}\n┃ 💰 Monto: ₡${formatCoins(amount)}\n\n╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
+    text += `┃ 📤 De: *@${ctx.sender.split("@")[0]}*\n┃ 📥 Para: @${target.split("@")[0]}\n┃ 💰 Monto: ${formatMoney(amount, ctx)}\n\n╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
     return ctx.reply({ text, mentions: [ctx.sender, target] });
   },
 };

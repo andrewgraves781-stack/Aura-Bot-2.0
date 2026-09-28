@@ -1,9 +1,9 @@
 import type { CommandContext } from "../../types/index.d.ts";
 import {
   cooldownText,
-  formatCoins,
   getEconomyUser,
   setEconomyUser,
+  formatMoney,
 } from "../../core/economyConfig.ts";
 
 export default {
@@ -29,10 +29,14 @@ export default {
       user.lastDaily && now - user.lastDaily > gracePeriod
         ? 1
         : (user.dailyStreak || 0) + 1;
-    const baseReward = Math.floor(Math.random() * 501) + 500;
-    const streakBonus = Math.min(user.dailyStreak - 1, 10) * 100;
+
+    const baseReward = 12000;
+    const streakBonus =
+      user.dailyStreak > 1
+        ? 12500 * Math.pow(2, Math.min(user.dailyStreak - 2, 10))
+        : 0;
     const totalReward = baseReward + streakBonus;
-    user.bolsillo += totalReward;
+    user.bolsillo = Number(user.bolsillo || 0) + totalReward;
     user.lastDaily = now;
     setEconomyUser(ctx.from, ctx.sender, user);
 
@@ -40,10 +44,10 @@ export default {
     text += `┃ 🔥 𝐑𝐀𝐂𝐇𝐀: *${user.dailyStreak} Días*\n`;
     text += `╰━━━━━━━━━━━━⬣\n\n`;
     text += `┃ 👋 Hola *@${ctx.sender.split("@")[0]}*\n`;
-    text += `┃ 🎉 Base: ₡${formatCoins(baseReward)}\n`;
-    text += `┃ ✨ Bono de Racha: +₡${formatCoins(streakBonus)}\n`;
-    text += `┃ 💰 Total Ganado: *₡${formatCoins(totalReward)}*\n`;
-    text += `┃ 💵 Saldo actual: ₡${formatCoins(user.bolsillo)}\n\n`;
+    text += `┃ 🎉 Base: ${formatMoney(baseReward, ctx)}\n`;
+    text += `┃ ✨ Bono Racha: +${formatMoney(streakBonus, ctx)}\n`;
+    text += `┃ 💰 Total Ganado: *${formatMoney(totalReward, ctx)}*\n`;
+    text += `┃ 💵 Saldo actual: ${formatMoney(user.bolsillo, ctx)}\n\n`;
     text += `╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
     return ctx.reply({ text, mentions: [ctx.sender] });
   },

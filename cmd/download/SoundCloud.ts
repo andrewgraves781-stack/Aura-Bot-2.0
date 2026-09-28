@@ -14,6 +14,12 @@ import {
 import { fytBold } from "../../core/socketText.ts";
 import { downloadToCache } from "../../core/downloadUtils.ts";
 import { createLinkPreviewWithoutChannel } from "../../core/LinkPreview.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 
 let cachedClientId: string | null = null;
 let cachedAt = 0;
@@ -148,7 +154,8 @@ export default {
   description: "Descarga canciones de SoundCloud.",
   category: "download",
 
-  async run({ args, reply, react, sock, from, msg, sender }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react, sock, from, msg, sender } = ctx;
     const query = args.join(" ").trim();
     if (!query) {
       return reply({
@@ -188,6 +195,8 @@ export default {
       if (!audioUrl)
         throw new Error("SoundCloud no devolvió una URL de audio válida.");
 
+      const file = await downloadToCache(audioUrl);
+      const { cost } = await prepareDownloadCharge(ctx, "audio", file);
       let caption = `╭〔 ${fytBold("SOUNDCLOUD PLAY")} 〕━⬣\n\n`;
       caption += `┃ ➥ ${fytBold(track.title || "Sin título")}\n\n`;
       caption += `┣━━━━━━━━━━━━⬣\n`;
@@ -196,6 +205,7 @@ export default {
       caption += `┃ > ${fytBold("Vistas")} › ${formatNumber(track.playback_count)}\n`;
       caption += `┃ > ${fytBold("Likes")} › ${formatNumber(track.likes_count)}\n`;
       caption += `┃ > ${fytBold("Tipo")} › Audio MP3\n`;
+      caption += `┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n`;
       caption += `┃ > ${fytBold("URL")} › ${track.permalink_url || query}\n`;
       caption += `┣━━━━━━━━━━━━⬣\n┃ ⏳️ Descargando Audio...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
 
@@ -233,10 +243,11 @@ export default {
       }
 
       await reply({
-        audio: { url: audioUrl },
+        audio: { url: file },
         mimetype: "audio/mpeg",
         fileName: `${safeTitle}.mp3`,
       });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

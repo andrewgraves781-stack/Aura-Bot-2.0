@@ -5,7 +5,12 @@ import type {
   InstagramDownloadResponse,
   InstagramMediaItem,
 } from "../../types/index.d.ts";
-
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 const INSTAGRAM_URL =
   /(?:instagram\.com|instagr\.am)\/(?:reels?|p|tv|stories)\//i;
 
@@ -13,7 +18,8 @@ export default {
   name: ["ig", "instagram"],
   category: "download",
   description: "Descarga videos o imágenes de Instagram.",
-  async run({ args, reply, react }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react } = ctx;
     const url = args.join(" ").trim();
     if (!url || !INSTAGRAM_URL.test(url))
       return reply("⚠️ Proporciona un enlace válido de Instagram.");
@@ -33,9 +39,11 @@ export default {
       const images = items.filter(
         (item: InstagramMediaItem) => item.type === "image" && item.url,
       );
-      const caption = `╭〔 📸 ${fytBold(video ? "INSTAGRAM VIDEO" : "INSTAGRAM POST")} 〕━⬣\n\n┃ ➥ ${fytBold(data?.caption || "Sin título")}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Total")} › ${video ? "1 video" : `${images.length} imágenes`}\n┃ > ${fytBold("Url")} › ${url}\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const mediaType = video ? "video" : "image";
       if (video) {
         const file = await downloadToCache(video.url, 180000);
+        const { cost } = await prepareDownloadCharge(ctx, mediaType, file);
+        const caption = `╭〔 📸 ${fytBold("INSTAGRAM VIDEO")} 〕━⬣\n\n┃ ➥ ${fytBold(data?.caption || "Sin título")}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Total")} › 1 video\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
         await reply({
           video: { url: file },
           mimetype: "video/mp4",
@@ -43,14 +51,22 @@ export default {
           caption,
         });
       } else if (images.length) {
-        for (const [index, item] of images.entries()) {
+        const files: string[] = [];
+        let cost = 0;
+        for (const item of images) {
           const file = await downloadToCache(item.url, 180000);
+          cost = (await prepareDownloadCharge(ctx, mediaType, file)).cost;
+          files.push(file);
+        }
+        const caption = `╭〔 📸 ${fytBold("INSTAGRAM POST")} 〕━⬣\n\n┃ ➥ ${fytBold(data?.caption || "Sin título")}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Total")} › ${images.length} imágenes\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+        for (const [index, file] of files.entries()) {
           await reply({
             image: { url: file },
             caption: index === 0 ? caption : undefined,
           });
         }
       } else throw new Error("No se encontró contenido multimedia.");
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

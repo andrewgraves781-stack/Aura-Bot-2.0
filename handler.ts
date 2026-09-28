@@ -19,8 +19,15 @@ import {
   NOT_MOD,
   NOT_PREMIUM,
 } from "./core/socketText.ts";
-import { db } from "./dbController/db.ts";
+import { db } from "./core/db.ts";
 import { handleGroupStatus, handleGroupToxic } from "./core/groupModeration.ts";
+import {
+  checkDownloadCoins,
+  chargeDownloadCost,
+  formatMoney,
+  getBotCurrency,
+  type DownloadMediaType,
+} from "./core/economyConfig.ts";
 
 import type {
   GroupMetadata,
@@ -1054,9 +1061,75 @@ export async function handleMessage(
     if (plugin.botUserOnly && !isBotUser)
       return ctx.reply({ text: NOT_BOT_USER() });
 
+    const isDownloadCmd =
+      pluginCategory === "download" ||
+      ["pin", "pinterest"].includes(cmdName.toLowerCase());
+
+    if (isDownloadCmd) {
+      let mediaType: DownloadMediaType = "document";
+      const name = cmdName.toLowerCase();
+
+      if (["pin", "pinterest"].includes(name)) {
+        mediaType = "image";
+      } else if (
+        [
+          "docplay",
+          "docvideo",
+          "doctta",
+          "docsoundcloud",
+          "docspotify",
+          "apk",
+          "mediafire",
+        ].includes(name)
+      ) {
+        mediaType = "document";
+      } else if (["play", "spotify", "soundcloud", "ttaudio"].includes(name)) {
+        mediaType = "audio";
+      } else if (
+        ["play2", "video", "tiktok", "tiktok2", "facebook", "instagram", "x"].includes(
+          name,
+        )
+      ) {
+        mediaType = "video";
+      }
+
+      const coinCheck = checkDownloadCoins(sender, mediaType);
+      (ctx as Record<string, unknown>)._downloadMediaType = mediaType;
+      if (!coinCheck.allowed && !isMod) {
+        const currency = getBotCurrency(ctx.botJid);
+        const labels: Record<DownloadMediaType, string> = {
+          audio: `Audio (200 - 1000 ${currency.name})`,
+          video: `Video (500 - 2000 ${currency.name})`,
+          image: `Imágenes (100 - 300 ${currency.name})`,
+          document: `Documentos (50 - 2000 ${currency.name})`,
+        };
+        return ctx.reply({
+          text:
+            `❌ *SALDO INSUFICIENTE EN ${currency.name.toUpperCase()}*\n\n` +
+            `┃ 💰 Tu saldo: *${formatMoney(coinCheck.currentBalance, currency)}*\n` +
+            `┃ ⚡ Requieres al menos *${formatMoney(coinCheck.minCost, currency)}* para descargas de ${labels[mediaType]}.\n\n` +
+            `💡 Reclama tu recompensa diaria (.daily), semanal (.semanal), quincenal (.quincenal) o mensual (.mensual) para ganar más ${currency.name}.`,
+        });
+      }
+    }
+
     const start = Date.now();
     try {
       await plugin.run(ctx);
+      const downloadState = ctx as Record<string, unknown>;
+      if (
+        isDownloadCmd &&
+        downloadState._downloadSuccess &&
+        !downloadState.downloadCharged
+      ) {
+        chargeDownloadCost(
+          sender,
+          (downloadState._downloadMediaType as DownloadMediaType) ||
+            "document",
+          Number(downloadState._downloadSize) || undefined,
+        );
+        downloadState.downloadCharged = true;
+      }
       logger.cmdExec?.({
         cmdName,
         sender: senderNum,

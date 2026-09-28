@@ -2,7 +2,7 @@ import type { CommandContext } from "../../types/index.d.ts";
 import {
   economyTarget,
   economyUser,
-  formatCoins,
+  formatMoney,
 } from "../../core/economyRuntime.ts";
 
 export default {
@@ -17,9 +17,9 @@ export default {
     text += `┃ 🏦 𝐄𝐒𝐓𝐀𝐃𝐎 𝐃𝐄 𝐂𝐔𝐄𝐍𝐓𝐀\n`;
     text += `╰━━━━━━━━━━━━⬣\n\n`;
     text += `┃ 👋 𝐔𝐬𝐮𝐚𝐫𝐢𝐨: *@${target.split("@")[0]}*\n\n`;
-    text += `┃ 💵 𝐂𝐚𝐫𝐭𝐞𝐫𝐚 › ₡${formatCoins(user.bolsillo)}\n`;
-    text += `┃ 🏦 𝐁𝐚𝐧𝐜𝐨 › ₡${formatCoins(user.banco)}\n`;
-    text += `┃ 💎 𝐓𝐨𝐭𝐚𝐥 › ₡${formatCoins(total)}\n\n`;
+    text += `┃ 💵 𝐂𝐚𝐫𝐭𝐞𝐫𝐚 › ${formatMoney(user.bolsillo, ctx)}\n`;
+    text += `┃ 🏦 𝐁𝐚𝐧𝐜𝐨 › ${formatMoney(user.banco, ctx)}\n`;
+    text += `┃ 💎 𝐓𝐨𝐭𝐚𝐥 › ${formatMoney(total, ctx)}\n\n`;
     text += `╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
     return ctx.reply({ text, mentions: [target] });
   },

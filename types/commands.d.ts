@@ -25,7 +25,7 @@ export interface CommandContext {
   botJid: string;
   botLabel: string;
   mainBotNum: string;
-  activeBotsLive: number;
+  activeBotsLive: ExtendedWASocket[];
   isGroup: boolean;
   groupName: string;
   groupMeta: GroupMetadata | null;
@@ -46,8 +46,8 @@ export interface CommandContext {
   isBotUser: boolean;
   resolveLid: (lidJid: string) => Promise<string>;
   clearGroupCache: () => boolean;
-  reply: (content: ReplyContent) => Promise<proto.WebMessageInfo | undefined>;
-  react: (emoji: string) => Promise<proto.WebMessageInfo | undefined>;
+  reply: (content: ReplyContent) => Promise<proto.WAMessage | undefined>;
+  react: (emoji: string) => Promise<proto.WAMessage | undefined>;
   copy: (
     text: string,
     copyCode: string,

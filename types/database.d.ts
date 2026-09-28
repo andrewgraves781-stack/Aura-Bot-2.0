@@ -108,6 +108,8 @@ export interface DatabaseBotData {
   ownerJid?: string;
   customPrefix?: string;
   sessionName?: string;
+  currency?: string;
+  currencySymbol?: string;
   [key: string]: unknown;
 }
 
@@ -122,6 +124,8 @@ export interface DatabaseBot {
   status: "active" | "offline" | "connecting" | string;
   modPrefix: string | null;
   modSelf: number;
+  currency?: string | null;
+  currencySymbol?: string | null;
   data?: DatabaseBotData;
   [key: string]: unknown;
 }
@@ -134,6 +138,8 @@ export interface UserDbRow {
   role: string | null;
   is_banned: number | null;
   self: number | null;
+  coins?: number | null;
+  bank?: number | null;
   data: string | null;
 }
 
@@ -172,6 +178,8 @@ export interface BotDbRow {
   status: string | null;
   modPrefix: string | null;
   modSelf: number | null;
+  currency?: string | null;
+  currencySymbol?: string | null;
   data: string | null;
 }
 

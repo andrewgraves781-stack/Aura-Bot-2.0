@@ -2,8 +2,8 @@ import type { CommandContext } from "../../types/index.d.ts";
 import {
   amountArg,
   economyUser,
-  formatCoins,
   saveEconomy,
+  formatMoney,
 } from "../../core/economyRuntime.ts";
 
 export default {
@@ -21,13 +21,13 @@ export default {
       );
     if (user.banco < amount)
       return ctx.reply(
-        `❌ No tienes suficientes fondos. Tienes *₡${formatCoins(user.banco)}*.`,
+        `❌ No tienes suficientes fondos. Tienes *${formatMoney(user.banco, ctx)}*.`,
       );
     user.banco -= amount;
     user.bolsillo += amount;
     saveEconomy(ctx, ctx.sender, user);
     let text = `╭〔 🏦 𝐁𝐀𝐍𝐂𝐎 〕⬣\n┃ 📤 𝐑𝐄𝐓𝐈𝐑𝐎 𝐄𝐗𝐈𝐓𝐎𝐒𝐎\n╰━━━━━━━━━━━━⬣\n\n`;
-    text += `┃ 📤 Retiraste: ₡${formatCoins(amount)}\n┃ 💵 Cartera: ₡${formatCoins(user.bolsillo)}\n┃ 🏦 Fondos restantes: ₡${formatCoins(user.banco)}\n\n╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
+    text += `┃ 📤 Retiraste: ${formatMoney(amount, ctx)}\n┃ 💵 Cartera: ${formatMoney(user.bolsillo, ctx)}\n┃ 🏦 Fondos restantes: ${formatMoney(user.banco, ctx)}\n\n╰〔 ⚡ 𝐀𝐔𝐑𝐀 𝐑𝐄𝐄𝐃 〕⬣`;
     return ctx.reply({ text, mentions: [ctx.sender] });
   },
 };

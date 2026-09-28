@@ -2,6 +2,12 @@ import type { CommandContext } from "../../types/index.d.ts";
 import { request } from "undici";
 import { fytBold } from "../../core/socketText.ts";
 import { downloadToCache, safeFileName } from "../../core/downloadUtils.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 
 const HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AuraReedBot/2.0",
@@ -36,13 +42,15 @@ export default {
   name: ["md", "mf", "mediafire"],
   category: "download",
   description: "Descarga archivos de MediaFire.",
-  async run({ args, reply, react }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react } = ctx;
     const url = args.join(" ").trim();
     if (!url) return reply("⚠️ Proporciona un enlace de MediaFire.");
     await react("⏳");
     try {
       const data = await resolveMediaFire(url);
       const file = await downloadToCache(data.download, 180000);
+      const { cost } = await prepareDownloadCharge(ctx, "document", file);
       const name = safeFileName(data.name, "mediafire");
       const extension =
         name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() || "bin";
@@ -50,9 +58,10 @@ export default {
         extension === "apk"
           ? "application/vnd.android.package-archive"
           : "application/octet-stream";
-      const caption = `╭〔 📦 ${fytBold("MEDIAFIRE DL")} 〕━⬣\n\n┃ ➥ ${fytBold(name)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Tamaño")} › ${data.size}\n┃ > ${fytBold("Extensión")} › .${extension.toUpperCase()}\n┃ > ${fytBold("Link")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando archivo...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 📦 ${fytBold("MEDIAFIRE DL")} 〕━⬣\n\n┃ ➥ ${fytBold(name)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Tamaño")} › ${data.size}\n┃ > ${fytBold("Extensión")} › .${extension.toUpperCase()}\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Link")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando archivo...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       await reply({ text: caption });
       await reply({ document: { url: file }, mimetype: mime, fileName: name });
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

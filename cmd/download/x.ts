@@ -7,6 +7,12 @@ import type {
   TwitterDownloadData,
   TwitterMediaItem,
 } from "../../types/index.d.ts";
+import {
+  prepareDownloadCharge,
+  confirmDownloadCharge,
+  formatMoney,
+  getBotCurrency,
+} from "../../core/economyConfig.ts";
 
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
 const KEY = DL_CONFIG.alya.API_KEY;
@@ -40,7 +46,8 @@ export default {
   name: ["x", "twitter", "xdl"],
   category: "download",
   description: "Descarga videos o imágenes de Twitter / X.",
-  async run({ args, reply, react }: CommandContext) {
+  async run(ctx: CommandContext) {
+    const { args, reply, react } = ctx;
     const url = args.join(" ").trim();
 
     if (!url || !SOCIAL_URL.test(url)) {
@@ -78,8 +85,14 @@ export default {
 
       const file = await downloadToCache(mediaUrl, 180000);
       const isVideo = type === "video" || /\.mp4(?:$|\?)/i.test(mediaUrl);
-      const caption = `⬣〔 ${fytBold("TWITTER DOWNLOAD")} 〕⬣`;
-
+      const { cost } = await prepareDownloadCharge(
+        ctx,
+        isVideo ? "video" : "image",
+        file,
+      );
+      let caption = `⬣〔 ${fytBold("TWITTER DOWNLOAD")} 〕⬣`;
+      caption += `\n\n${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}`;
+      caption += `\n\n╰━━〔 ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       if (isVideo) {
         await reply({
           video: { url: file },
@@ -90,7 +103,7 @@ export default {
       } else {
         await reply({ image: { url: file }, caption });
       }
-
+      confirmDownloadCharge(ctx);
       await react("✅");
     } catch (error: unknown) {
       await react("❌");

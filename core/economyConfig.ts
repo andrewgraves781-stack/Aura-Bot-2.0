@@ -1,11 +1,18 @@
-import { db } from "../dbController/db.ts";
-import type { EconomyUser, CooldownRows } from "../types/index.d.ts";
+import { db } from "./db.ts";
+import { getFileBytes } from "./downloadUtils.ts";
+import type {
+  CommandContext,
+  EconomyUser,
+  CooldownRows,
+} from "../types/index.d.ts";
 
 export type { EconomyUser, CooldownRows };
 
 const DEFAULT_ECONOMY_USER: EconomyUser = {
-  bolsillo: 0,
-  banco: 0,
+  bolsillo: 100000,
+  banco: 10000,
+  coins: 100000,
+  bank: 10000,
 };
 
 const COOLDOWNS: CooldownRows = {
@@ -34,6 +41,140 @@ export function formTime(ms: number): string {
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
+}
+
+function parseJidAndDefaults(
+  arg1: string,
+  arg2?: string | Partial<EconomyUser>,
+  arg3?: Partial<EconomyUser>,
+): { userJid: string; defaults: Partial<EconomyUser> } {
+  if (typeof arg2 === "string") {
+    return { userJid: arg2, defaults: arg3 || {} };
+  }
+  return { userJid: arg1, defaults: (arg2 as Partial<EconomyUser>) || {} };
+}
+
+export function getEconomyUser(
+  arg1: string,
+  arg2?: string | Partial<EconomyUser>,
+  arg3?: Partial<EconomyUser>,
+): EconomyUser {
+  const { userJid, defaults } = parseJidAndDefaults(arg1, arg2, arg3);
+  const dbUser = db.getUser(userJid);
+  const userData = (dbUser.data || {}) as Record<string, unknown>;
+  const economyData = (userData.economy || {}) as Record<string, unknown>;
+
+  const merged: EconomyUser = {
+    ...DEFAULT_ECONOMY_USER,
+    ...userData,
+    ...economyData,
+    ...defaults,
+  };
+
+  const savedCoins =
+    economyData.bolsillo ??
+    economyData.coins ??
+    userData.bolsillo ??
+    userData.coins ??
+    (dbUser as Record<string, unknown>).coins ??
+    (dbUser as Record<string, unknown>).bolsillo;
+
+  const savedBank =
+    economyData.banco ??
+    economyData.bank ??
+    userData.banco ??
+    userData.bank ??
+    (dbUser as Record<string, unknown>).bank ??
+    (dbUser as Record<string, unknown>).banco;
+
+  const rawCoins = Number(
+    savedCoins !== undefined && savedCoins !== null
+      ? savedCoins
+      : defaults.bolsillo !== undefined && defaults.bolsillo !== 0
+        ? defaults.bolsillo
+        : defaults.coins !== undefined && defaults.coins !== 0
+          ? defaults.coins
+          : DEFAULT_ECONOMY_USER.bolsillo ?? 100000,
+  );
+
+  const rawBank = Number(
+    savedBank !== undefined && savedBank !== null
+      ? savedBank
+      : defaults.banco !== undefined && defaults.banco !== 0
+        ? defaults.banco
+        : defaults.bank !== undefined && defaults.bank !== 0
+          ? defaults.bank
+          : DEFAULT_ECONOMY_USER.banco ?? 10000,
+  );
+
+  merged.bolsillo = rawCoins;
+  merged.coins = rawCoins;
+  merged.banco = rawBank;
+  merged.bank = rawBank;
+
+  return merged;
+}
+
+export function setEconomyUser(
+  arg1: string,
+  arg2?: string | Partial<EconomyUser>,
+  arg3?: Partial<EconomyUser>,
+): EconomyUser {
+  let userJid: string;
+  let data: Partial<EconomyUser>;
+
+  if (typeof arg2 === "string") {
+    userJid = arg2;
+    data = (arg3 as Partial<EconomyUser>) || {};
+  } else {
+    userJid = arg1;
+    data = (arg2 as Partial<EconomyUser>) || {};
+  }
+
+  const current = getEconomyUser(userJid);
+  const updated = { ...current, ...data };
+
+  const finalCoins = Number(
+    data.bolsillo ?? data.coins ?? updated.bolsillo ?? updated.coins ?? 100000,
+  );
+  const finalBank = Number(
+    data.banco ?? data.bank ?? updated.banco ?? updated.bank ?? 10000,
+  );
+
+  updated.bolsillo = finalCoins;
+  updated.coins = finalCoins;
+  updated.banco = finalBank;
+  updated.bank = finalBank;
+
+  const dbUser = db.getUser(userJid);
+  const userData = (dbUser.data || {}) as Record<string, unknown>;
+  const currentEconomy = (userData.economy || {}) as Record<string, unknown>;
+
+  const nextEconomy = {
+    ...currentEconomy,
+    ...updated,
+    bolsillo: finalCoins,
+    coins: finalCoins,
+    banco: finalBank,
+    bank: finalBank,
+  };
+
+  const nextData = {
+    ...userData,
+    economy: nextEconomy,
+    bolsillo: finalCoins,
+    coins: finalCoins,
+    banco: finalBank,
+    bank: finalBank,
+  };
+
+  db.setUser(userJid, {
+    ...nextData,
+    coins: finalCoins,
+    bank: finalBank,
+  });
+
+  return updated;
 }
 
 export function checkCooldown(
@@ -69,8 +210,9 @@ export function setCooldown(
 
 export function addBolsillo(groupJid: string, userJid: string, amount: number) {
   const user = getEconomyUser(groupJid, userJid);
-  const current = Number(user.bolsillo ?? 0);
-  setEconomyUser(groupJid, userJid, { bolsillo: current + amount });
+  const current = Number(user.bolsillo ?? user.coins ?? 0);
+  const next = current + amount;
+  setEconomyUser(groupJid, userJid, { bolsillo: next, coins: next });
 }
 
 export function getAuraLevel(points: number): number {
@@ -81,9 +223,9 @@ export function getAuraLevel(points: number): number {
   return 4;
 }
 
-export function getBolsillo(groupJid: string, userJid: string): number {
+export function getBolsillo(groupJid: string, userJid?: string): number {
   const user = getEconomyUser(groupJid, userJid);
-  return Number(user.bolsillo ?? 0);
+  return Number(user.bolsillo ?? user.coins ?? 0);
 }
 
 export function addAura(jid: string, amount: number) {
@@ -120,50 +262,231 @@ export function transferBolsillo(
   return true;
 }
 
-function getEconomyStore(groupJid: string): Record<string, EconomyUser> {
-  const group = db.getGroup(groupJid);
-  const groupData = (group.data || {}) as Record<string, unknown>;
-  const economy = (groupData.economy || {}) as Record<string, unknown>;
-  const users = (economy.users || {}) as Record<string, EconomyUser>;
-  return users;
-}
-
-export function getEconomyUser(
-  groupJid: string,
-  userJid: string,
-  defaults: Partial<EconomyUser> = {},
-): EconomyUser {
-  const users = getEconomyStore(groupJid);
-  return { ...DEFAULT_ECONOMY_USER, ...defaults, ...(users[userJid] ?? {}) };
-}
-
-export function setEconomyUser(
-  groupJid: string,
-  userJid: string,
-  data: Partial<EconomyUser>,
-): EconomyUser {
-  const group = db.getGroup(groupJid);
-  const groupData = (group.data || {}) as Record<string, unknown>;
-  const economy = (groupData.economy || {}) as Record<string, unknown>;
-  const users = getEconomyStore(groupJid);
-  users[userJid] = { ...getEconomyUser(groupJid, userJid), ...data };
-  db.setGroup(groupJid, {
-    ...group,
-    economy: { ...economy, users },
-  });
-  return users[userJid];
-}
-
 export function getGroupEconomyUsers(
-  groupJid: string,
+  _groupJid?: string,
 ): Record<string, EconomyUser> {
-  return getEconomyStore(groupJid);
+  const allUsers = db.getAllUsers();
+  const map: Record<string, EconomyUser> = {};
+  for (const user of allUsers) {
+    if (user.jid) {
+      map[user.jid] = getEconomyUser(user.jid);
+    }
+  }
+  return map;
 }
 
 export function formatCoins(value: number): string {
   return Math.max(0, Math.floor(Number(value) || 0)).toLocaleString("es-ES");
 }
 
+export const DEFAULT_BOT_CURRENCY: BotCurrency = {
+  name: "AuraCoins",
+  symbol: "₡",
+};
+
+export type BotCurrency = {
+  name: string;
+  symbol: string;
+};
+
+export type CurrencySource =
+  | CommandContext
+  | string
+  | BotCurrency
+  | null
+  | undefined;
+
+function isBotCurrency(value: unknown): value is BotCurrency {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "name" in value &&
+      "symbol" in value &&
+      !("botJid" in value),
+  );
+}
+
+export function getBotCurrency(source?: CurrencySource): BotCurrency {
+  if (isBotCurrency(source)) {
+    const name = String(source.name || "").trim() || DEFAULT_BOT_CURRENCY.name;
+    const symbol =
+      String(source.symbol || "").trim() || DEFAULT_BOT_CURRENCY.symbol;
+    return { name, symbol };
+  }
+
+  const botJid =
+    typeof source === "string"
+      ? source
+      : source && typeof source === "object"
+        ? source.botJid
+        : "";
+  if (!botJid) return { ...DEFAULT_BOT_CURRENCY };
+
+  const bot = db.getBot(botJid);
+  const data = (bot.data || {}) as Record<string, unknown>;
+  const name =
+    String(bot.currency ?? data.currency ?? DEFAULT_BOT_CURRENCY.name).trim() ||
+    DEFAULT_BOT_CURRENCY.name;
+  const symbol =
+    String(
+      bot.currencySymbol ??
+        data.currencySymbol ??
+        DEFAULT_BOT_CURRENCY.symbol,
+    ).trim() || DEFAULT_BOT_CURRENCY.symbol;
+  return { name, symbol };
+}
+
+export function setBotCurrency(
+  botJid: string,
+  name: string,
+  symbol = DEFAULT_BOT_CURRENCY.symbol,
+): BotCurrency {
+  const currency: BotCurrency = {
+    name: name.trim() || DEFAULT_BOT_CURRENCY.name,
+    symbol: symbol.trim() || DEFAULT_BOT_CURRENCY.symbol,
+  };
+  db.setBot(botJid, {
+    currency: currency.name,
+    currencySymbol: currency.symbol,
+    data: {
+      ...(db.getBot(botJid).data || {}),
+      currency: currency.name,
+      currencySymbol: currency.symbol,
+    },
+  });
+  return currency;
+}
+
+export function formatMoney(
+  value: number,
+  source?: CurrencySource,
+): string {
+  const currency = getBotCurrency(source);
+  return `${currency.symbol}${formatCoins(value)} ${currency.name}`;
+}
+
 export function cooldownText(remaining: number): string {
   return formTime(Math.max(0, remaining));
+}
+
+export type DownloadMediaType = "audio" | "video" | "image" | "document";
+
+export const DOWNLOAD_COST_RANGES: Record<
+  DownloadMediaType,
+  { min: number; max: number; refMinBytes: number; refMaxBytes: number }
+> = {
+  audio: {
+    min: 200,
+    max: 1000,
+    refMinBytes: 1 * 1024 * 1024,
+    refMaxBytes: 150 * 1024 * 1024,
+  },
+  video: {
+    min: 500,
+    max: 2000,
+    refMinBytes: 2 * 1024 * 1024,
+    refMaxBytes: 250 * 1024 * 1024,
+  },
+  image: {
+    min: 100,
+    max: 300,
+    refMinBytes: 200 * 1024,
+    refMaxBytes: 30 * 1024 * 1024,
+  },
+  document: {
+    min: 50,
+    max: 2000,
+    refMinBytes: 1 * 1024,
+    refMaxBytes: 2 * 1024 * 1024 * 1024,
+  },
+};
+
+export function getDownloadCost(
+  type: DownloadMediaType,
+  sizeInBytes?: number,
+): number {
+  const range = DOWNLOAD_COST_RANGES[type] ?? DOWNLOAD_COST_RANGES.document;
+  if (!sizeInBytes || sizeInBytes <= 0) return range.min;
+
+  if (sizeInBytes <= range.refMinBytes) return range.min;
+  if (sizeInBytes >= range.refMaxBytes) return range.max;
+
+  const ratio =
+    (sizeInBytes - range.refMinBytes) / (range.refMaxBytes - range.refMinBytes);
+  const cost = Math.round(range.min + ratio * (range.max - range.min));
+  return Math.min(range.max, Math.max(range.min, cost));
+}
+
+export function checkDownloadCoins(
+  userJid: string,
+  type: DownloadMediaType,
+  sizeInBytes?: number,
+): { allowed: boolean; cost: number; minCost: number; currentBalance: number } {
+  const user = getEconomyUser(userJid);
+  const range = DOWNLOAD_COST_RANGES[type] ?? DOWNLOAD_COST_RANGES.document;
+  const cost = getDownloadCost(type, sizeInBytes);
+  const currentBalance = Number(user.bolsillo ?? 0);
+  return {
+    allowed: currentBalance >= cost,
+    cost,
+    minCost: range.min,
+    currentBalance,
+  };
+}
+
+type DownloadChargeContext = CommandContext & {
+  _downloadMediaType?: DownloadMediaType;
+  _downloadSize?: number;
+  _downloadSuccess?: boolean;
+  downloadCharged?: boolean;
+};
+
+export async function prepareDownloadCharge(
+  ctx: CommandContext,
+  type: DownloadMediaType,
+  filePath: string,
+): Promise<{ cost: number; size: number }> {
+  const size = await getFileBytes(filePath);
+  const bag = ctx as DownloadChargeContext;
+  bag._downloadMediaType = type;
+  bag._downloadSize = Number(bag._downloadSize || 0) + size;
+  const cost = getDownloadCost(type, bag._downloadSize);
+  if (!ctx.isMod) {
+    const currentBalance = getBolsillo(ctx.sender);
+    if (currentBalance < cost) {
+      bag._downloadSize = Math.max(0, Number(bag._downloadSize) - size);
+      bag._downloadSuccess = false;
+      throw new Error(
+        `Saldo insuficiente. Necesitas ${formatMoney(cost, ctx)} y tienes ${formatMoney(currentBalance, ctx)}.`,
+      );
+    }
+  }
+  return { cost, size };
+}
+
+export function confirmDownloadCharge(ctx: CommandContext): void {
+  const bag = ctx as DownloadChargeContext;
+  if (bag.downloadCharged) return;
+  const size = Number(bag._downloadSize) || 0;
+  if (size <= 0) return;
+  chargeDownloadCost(
+    ctx.sender,
+    bag._downloadMediaType || "document",
+    size,
+  );
+  bag._downloadSuccess = true;
+  bag.downloadCharged = true;
+}
+
+export function chargeDownloadCost(
+  userJid: string,
+  type: DownloadMediaType,
+  sizeInBytes?: number,
+): { cost: number; remaining: number } {
+  const cost = getDownloadCost(type, sizeInBytes);
+  const user = getEconomyUser(userJid);
+  const currentBalance = Number(user.bolsillo ?? 0);
+  const newBalance = Math.max(0, currentBalance - cost);
+  setEconomyUser(userJid, { bolsillo: newBalance, coins: newBalance });
+  return { cost, remaining: newBalance };
 }

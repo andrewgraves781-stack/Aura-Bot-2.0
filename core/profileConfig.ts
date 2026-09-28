@@ -1,9 +1,10 @@
-import { db } from "../dbController/db.ts";
+import { db } from "./db.ts";
 import { fytBold } from "./socketText.ts";
-import { getAuraLevel } from "./economyConfig.ts";
+import { getAuraLevel, getBotCurrency, formatMoney } from "./economyConfig.ts";
 import { economyUser } from "./economyRuntime.ts";
 import { sendDownloadPreview } from "./downloadPreview.ts";
 import { LRUCache } from "lru-cache";
+import { formatCount } from "./downloadUtils.ts"
 import type { WAMessage } from "@whiskeysockets/baileys";
 import type { Profile, PendingProfileAction } from "../types/index.d.ts";
 import type { CommandContext } from "../types/commands.d.ts";
@@ -145,6 +146,9 @@ export function formatProfile(
   const wallet = Number(profile.bolsillo ?? 0);
   const bank = Number(profile.banco ?? profile.bank ?? 0);
   const userId = `WB${jid.split("@")[0]}`;
+  const currency = getBotCurrency(
+    (profile as Profile & { botJid?: string }).botJid,
+  );
 
   const text = [
     `${PROFILE_REPOSITORY_URL}`,
@@ -167,9 +171,9 @@ export function formatProfile(
     "",
     `┏━━〔 ${fytBold("RANGO")} 〕━━⬣`,
     `┃ 📊 ${fytBold("Nivel Aura")} › ${level}`,
-    `┃ ✨ ${fytBold("Puntos Aura")} › ${formatCompact(xp)}`,
-    `┃ 💵 ${fytBold("Cartera")} › ₡${formatCompact(wallet)}`,
-    `┃ 🏦 ${fytBold("Banco")} › ₡${formatCompact(bank)}`,
+    `┃ ✨ ${fytBold("Puntos Aura")} › ${formatCount(xp)}`,
+    `┃ 💵 ${fytBold("Cartera")} › ${formatMoney(wallet, currency)}`,
+    `┃ 🏦 ${fytBold("Banco")} › ${formatMoney(bank, currency)}`,
     "",
     `╰〔 ⚡ ${fytBold("AURA REED")} 〕⬣`,
   ].join("\n");
@@ -210,6 +214,7 @@ export async function sendProfilePreview(ctx: CommandContext, target: string) {
     ...profile,
     bolsillo: economy.bolsillo,
     banco: economy.banco,
+    botJid: ctx.botJid,
   });
 
   // Enriquece las menciones con LIDs para usuarios que ya migraron al nuevo
@@ -261,10 +266,4 @@ function getAge(value: string): number | null {
       today.getDate() >= birth.getDate());
   if (!birthdayPassed) age -= 1;
   return Math.max(0, age);
-}
-
-function formatCompact(value: number): string {
-  if (value >= 1000)
-    return `${(value / 1000).toFixed(value >= 1000000 ? 0 : 1)}K`;
-  return value.toLocaleString("es-ES");
 }

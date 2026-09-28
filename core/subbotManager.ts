@@ -1,5 +1,5 @@
 import { connectToWhatsApp, type ConnectionOptions } from "./conection.ts";
-import { db } from "../dbController/db.ts";
+import { db } from "./db.ts";
 import type { ExtendedWASocket, SubBotLinkRequest } from "../types/index.d.ts";
 
 export type LinkRequest = SubBotLinkRequest;
