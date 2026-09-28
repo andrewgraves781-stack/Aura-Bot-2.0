@@ -86,6 +86,7 @@ export interface DatabaseGroup {
   self?: number;
   topMsgUsers?: TopMsgUser[] | string;
   catBlocked?: string[] | string;
+  mutedUsers?: string[] | string;
   primaryBot?: string | null;
   chatBanned?: boolean | number;
   botOn?: number;

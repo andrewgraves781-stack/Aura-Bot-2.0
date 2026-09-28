@@ -167,3 +167,16 @@ export const IS_SUBBOT_ONLINE = ({ prefix }: { prefix?: string }) => {
 ┃ > cuando quieras desvincular escriba \`${prefix}logout\`
 ┃ > para cerrar la sesión del sub-bot.`;
 };
+
+export const NOT_HAVE_COINS = ({userBalance, typeMedia, minAmount, currencyName, requiredAmount}) => {
+  return `╭〔 ⚠️ ${fytBold("AURA REED")}〕⬣
+┃ ❌ ${fytBold("SALDO INSUFICIENTE")}
+╰━━━━━━━━━━━━⬣
+┃ > Tu saldo de ${currencyName} es insuficiente para descargar ${typeMedia}.
+┃ > Requieres al menos *${requiredAmount || minAmount}* para descargas de ${typeMedia}.
+┃ > Tu saldo actual es: *${userBalance}*.
+┃ > Debes farmear más ${currencyName}
+┃ > para descargar más ${typeMedia}
+╰━━〔 ${fytBold("AURA ECONOMY")} 〕━━⬣
+`;
+}

@@ -18,6 +18,7 @@ import {
   NOT_ADMIN,
   NOT_MOD,
   NOT_PREMIUM,
+  NOT_HAVE_COINS
 } from "./core/socketText.ts";
 import { db } from "./core/db.ts";
 import { handleGroupStatus, handleGroupToxic } from "./core/groupModeration.ts";
@@ -724,6 +725,27 @@ export async function handleMessage(
       if (!isCmd && body) {
         runtimeOptions.handleChatXp?.(sender);
       }
+      
+      // Verificar si el usuario está silenciado y eliminar su mensaje
+      if (isGroup && !isCmd && !isBotUser && !isMod && !isAdmin) {
+        const mutedUsers = groupData?.mutedUsers;
+        if (Array.isArray(mutedUsers) && mutedUsers.length > 0) {
+          const isMuted = mutedUsers.some((mutedJid: string) => {
+            const cleanMuted = String(mutedJid || "").split("@")[0].split(":")[0];
+            const cleanSender = sender.split("@")[0].split(":")[0];
+            return cleanMuted === cleanSender || mutedJid === sender;
+          });
+          
+          if (isMuted) {
+            try {
+              await sock.sendMessage(from, { delete: msg.key });
+              return;
+            } catch (deleteError) {
+              logger.warn?.(`Error al eliminar mensaje de usuario silenciado: ${String(deleteError)}`);
+            }
+          }
+        }
+      }
     }
 
     const logPayload = {
@@ -1103,13 +1125,19 @@ export async function handleMessage(
           image: `Imágenes (100 - 300 ${currency.name})`,
           document: `Documentos (50 - 2000 ${currency.name})`,
         };
-        return ctx.reply({
-          text:
-            `❌ *SALDO INSUFICIENTE EN ${currency.name.toUpperCase()}*\n\n` +
-            `┃ 💰 Tu saldo: *${formatMoney(coinCheck.currentBalance, currency)}*\n` +
-            `┃ ⚡ Requieres al menos *${formatMoney(coinCheck.minCost, currency)}* para descargas de ${labels[mediaType]}.\n\n` +
-            `💡 Reclama tu recompensa diaria (.daily), semanal (.semanal), quincenal (.quincenal) o mensual (.mensual) para ganar más ${currency.name}.`,
-        });
+        const requiredAmount = formatMoney(coinCheck.minCost, currency);
+        const userBalance = formatMoney(coinCheck.currentBalance, currency);
+        const typeMedia = labels[mediaType]
+        const minAmount = formatMoney(coinCheck.minCost, currency)
+        const currencyName = currency.name.toUpperCase()
+
+        return ctx.reply({text: NOT_HAVE_COINS({
+          typeMedia,
+          requiredAmount,
+          userBalance,
+          minAmount,
+          currencyName
+        })});
       }
     }
 
