@@ -359,52 +359,33 @@ export async function connectToWhatsApp(
       const botPhoneNumber = cleanPhoneNumber(botJid);
       const botLid = cleanLid(botId);
       const botGroups = await getBotGroups(extendedSock);
-      const botName = getBotDisplayName(extendedSock);
+      const previousBot = db.getBot(botJid);
+      const botName = getBotDisplayName(extendedSock, previousBot?.bot_name);
       extendedSock.subBotId = botId;
-      
+      db.setBot(botJid, {
+        bot_id: botId,
+        bot_name: botName,
+        phone_number: botPhoneNumber,
+        lid: botLid,
+        groups: botGroups,
+        isMain: isSubBot ? 0 : 1,
+        status: "active",
+        sessionName,
+      });
+      db.setUser(botJid, {
+        jid: botJid,
+        lid: botLid ? `${botLid}@lid` : null,
+        username: botName,
+        pushName: botName,
+        phone_number: botPhoneNumber,
+      });
+      if (sessionName !== botJid) db.deleteBot(sessionName);
       resetReconnectAttempts(sessionName);
       connectionLog(
         `WhatsApp conectado correctamente. JID: ${mainNum}`,
         "alert",
       );
       await options.onConnected?.();
-      
-      // Guardar datos en DB después de la conexión exitosa (no bloquea)
-      void (async () => {
-        try {
-          const previousBot = db.getBot(botJid);
-          const finalBotName = getBotDisplayName(extendedSock, previousBot?.bot_name);
-          
-          db.setBot(botJid, {
-            bot_id: botId,
-            bot_name: finalBotName,
-            phone_number: botPhoneNumber,
-            lid: botLid,
-            groups: botGroups,
-            isMain: isSubBot ? 0 : 1,
-            status: "active",
-            sessionName,
-          });
-          db.setUser(botJid, {
-            jid: botJid,
-            lid: botLid ? `${botLid}@lid` : null,
-            username: finalBotName,
-            pushName: finalBotName,
-            phone_number: botPhoneNumber,
-          });
-          if (sessionName !== botJid) db.deleteBot(sessionName);
-          connectionLog(
-            `Datos guardados correctamente en base de datos para ${botJid}`,
-            "info",
-          );
-        } catch (dbError) {
-          connectionLog(
-            `Error al guardar datos en base de datos (no afecta la conexión): ${String(dbError)}`,
-            "warn",
-          );
-        }
-      })();
-      
       return;
     }
 
@@ -440,27 +421,11 @@ export async function connectToWhatsApp(
       const logoutBotJid = sock.user?.id
         ? jidNormalizedUser(sock.user.id)
         : sessionName;
-      
+      db.setBot(logoutBotJid, { status: "offline" });
       connectionLog(
         "Sesión cerrada por comando del bot. No se reconectará automáticamente.",
         "alert",
       );
-      
-      // Guardar estado offline en DB después del cierre de sesión
-      void (async () => {
-        try {
-          db.setBot(logoutBotJid, { status: "offline" });
-          connectionLog(
-            `Estado offline guardado en DB para ${logoutBotJid}`,
-            "info",
-          );
-        } catch (dbError) {
-          connectionLog(
-            `Error al guardar estado offline en DB (no afecta): ${String(dbError)}`,
-            "warn",
-          );
-        }
-      })();
 
       if (!isSubBot) {
         globalThis.mainSocket = null;
@@ -520,21 +485,7 @@ export async function connectToWhatsApp(
       ? jidNormalizedUser(sock.user.id)
       : "";
     if (disconnectedBotJid && !isNotRegistered) {
-      // Guardar estado offline en DB después de la desconexión
-      void (async () => {
-        try {
-          db.setBot(disconnectedBotJid, { status: "offline" });
-          connectionLog(
-            `Estado offline guardado en DB para ${disconnectedBotJid}`,
-            "info",
-          );
-        } catch (dbError) {
-          connectionLog(
-            `Error al guardar estado offline en DB (no afecta): ${String(dbError)}`,
-            "warn",
-          );
-        }
-      })();
+      db.setBot(disconnectedBotJid, { status: "offline" });
     }
 
     if (isSubBot && isNotRegistered) {
@@ -552,18 +503,7 @@ export async function connectToWhatsApp(
         }
       }
 
-      // Operación de base de datos sin bloquear
-      void (async () => {
-        try {
-          db.deleteBot(sessionName);
-        } catch (dbError) {
-          connectionLog(
-            `Error al eliminar bot de DB (no afecta): ${String(dbError)}`,
-            "warn",
-          );
-        }
-      })();
-      
+      db.deleteBot(sessionName);
       await options.onPairingExpired?.();
       connectionLog(
         "Vinculación del subbot detenida definitivamente; no se solicitará un QR de respaldo.",
@@ -598,28 +538,6 @@ export async function connectToWhatsApp(
         `Desconexión temporal detectada. Reintentando sin borrar la sesión actual...`,
         "warn",
       );
-      
-      // Guardar estado offline antes de reconectar
-      const disconnectedBotJid = sock.user?.id
-        ? jidNormalizedUser(sock.user.id)
-        : "";
-      if (disconnectedBotJid) {
-        void (async () => {
-          try {
-            db.setBot(disconnectedBotJid, { status: "offline" });
-            connectionLog(
-              `Estado offline guardado antes de reconexión para ${disconnectedBotJid}`,
-              "info",
-            );
-          } catch (dbError) {
-            connectionLog(
-              `Error al guardar estado offline antes de reconexión (no afecta): ${String(dbError)}`,
-              "warn",
-            );
-          }
-        })();
-      }
-      
       scheduleReconnect(delayMs, sessionName, isSubBot, options);
       return;
     }
@@ -705,19 +623,7 @@ export async function connectToWhatsApp(
       try {
         if (msg.key?.remoteJid?.endsWith("@g.us")) {
           const connectedBot = sock.user?.id || "";
-          if (connectedBot) {
-            // Operación de base de datos sin bloquear el procesamiento de mensajes
-            void (async () => {
-              try {
-                db.addBotGroup(connectedBot, msg.key.remoteJid);
-              } catch (dbError) {
-                connectionLog(
-                  `Error al agregar grupo a DB (no afecta mensaje): ${String(dbError)}`,
-                  "warn",
-                );
-              }
-            })();
-          }
+          if (connectedBot) db.addBotGroup(connectedBot, msg.key.remoteJid);
         }
         await handleMessage(
           sock,

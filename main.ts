@@ -49,39 +49,11 @@ setInterval(
 async function mainBot() {
   await displayBanner();
   logInfo("Inicializando bot principal...");
-  
-  // Cargar plugins independientemente del estado de la DB
-  try {
-    await loadPlugins();
-    watchPlugins();
-    logInfo("Plugins cargados correctamente");
-  } catch (pluginError) {
-    logInfo(`Error al cargar plugins (continuando): ${String(pluginError)}`);
-  }
-  
-  // Iniciar subbots sin bloquear el inicio principal
-  void (async () => {
-    try {
-      await startSavedSubBots();
-    } catch (subbotError) {
-      connectionLog(
-        `Error al iniciar subbots (continuando): ${String(subbotError)}`,
-        "warn",
-      );
-    }
-  })();
-  
+  await loadPlugins();
+  watchPlugins();
+  await startSavedSubBots();
   connectionLog("Conectando a WhatsApp...");
-  
-  // Iniciar bot principal sin dependencia crítica de DB
-  try {
-    await connectToWhatsApp("main", false);
-  } catch (connectionError) {
-    connectionLog(
-      `Error al conectar bot principal: ${String(connectionError)}`,
-      "error",
-    );
-  }
+  await connectToWhatsApp("main", false);
 }
 
 void mainBot();
