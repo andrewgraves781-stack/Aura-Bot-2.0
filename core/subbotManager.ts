@@ -1,5 +1,6 @@
 import { connectToWhatsApp, type ConnectionOptions } from "./conection.ts";
 import { db } from "./db.ts";
+import { connectionLog } from "./logger.ts";
 import type { ExtendedWASocket, SubBotLinkRequest } from "../types/index.d.ts";
 
 export type LinkRequest = SubBotLinkRequest;
@@ -86,26 +87,56 @@ export async function requestSubBotLink(request: LinkRequest) {
 }
 
 export async function startSavedSubBots() {
-  for (const bot of db.getAllBots()) {
-    if (String(bot.jid || "").startsWith("sub-")) {
-      db.deleteBot(bot.jid);
-      continue;
+  try {
+    const allBots = db.getAllBots();
+    connectionLog(`Iniciando ${allBots.length} bots guardados...`, "info");
+    
+    for (const bot of allBots) {
+      if (String(bot.jid || "").startsWith("sub-")) {
+        void (async () => {
+          try {
+            db.deleteBot(bot.jid);
+          } catch (dbError) {
+            connectionLog(
+              `Error al limpiar bot obsoleto ${bot.jid}: ${String(dbError)}`,
+              "warn",
+            );
+          }
+        })();
+        continue;
+      }
+
+      const sessionName = (bot.data as Record<string, unknown> | undefined)
+        ?.sessionName as string | undefined;
+      if (bot.isMain || !sessionName) continue;
+      if (activeSubBots.has(sessionName)) continue;
+
+      // Iniciar conexión sin depender de que la DB esté completamente operativa
+      void (async () => {
+        try {
+          const connection = await connectToWhatsApp(sessionName, true, {
+            allowPairing: false,
+            onSocketCreated: (socket) => {
+              activeSubBots.set(sessionName, socket);
+            },
+            onDisconnected: () => {
+              cleanSubBot(sessionName);
+            },
+          });
+          if (connection) activeSubBots.set(sessionName, connection);
+          connectionLog(`Subbot ${sessionName} iniciado correctamente`, "info");
+        } catch (connectionError) {
+          connectionLog(
+            `Error al iniciar subbot ${sessionName}: ${String(connectionError)}`,
+            "warn",
+          );
+        }
+      })();
     }
-
-    const sessionName = (bot.data as Record<string, unknown> | undefined)
-      ?.sessionName as string | undefined;
-    if (bot.isMain || !sessionName) continue;
-    if (activeSubBots.has(sessionName)) continue;
-
-    const connection = await connectToWhatsApp(sessionName, true, {
-      allowPairing: false,
-      onSocketCreated: (socket) => {
-        activeSubBots.set(sessionName, socket);
-      },
-      onDisconnected: () => {
-        cleanSubBot(sessionName);
-      },
-    });
-    if (connection) activeSubBots.set(sessionName, connection);
+  } catch (dbError) {
+    connectionLog(
+      `Error al obtener bots de la base de datos, continuando sin subbots: ${String(dbError)}`,
+      "warn",
+    );
   }
 }

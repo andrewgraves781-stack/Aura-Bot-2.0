@@ -359,8 +359,7 @@ export async function connectToWhatsApp(
       const botPhoneNumber = cleanPhoneNumber(botJid);
       const botLid = cleanLid(botId);
       const botGroups = await getBotGroups(extendedSock);
-      const previousBot = db.getBot(botJid);
-      const botName = getBotDisplayName(extendedSock, previousBot?.bot_name);
+      const botName = getBotDisplayName(extendedSock);
       extendedSock.subBotId = botId;
       
       resetReconnectAttempts(sessionName);
@@ -373,9 +372,12 @@ export async function connectToWhatsApp(
       // Guardar datos en DB después de la conexión exitosa (no bloquea)
       void (async () => {
         try {
+          const previousBot = db.getBot(botJid);
+          const finalBotName = getBotDisplayName(extendedSock, previousBot?.bot_name);
+          
           db.setBot(botJid, {
             bot_id: botId,
-            bot_name: botName,
+            bot_name: finalBotName,
             phone_number: botPhoneNumber,
             lid: botLid,
             groups: botGroups,
@@ -386,8 +388,8 @@ export async function connectToWhatsApp(
           db.setUser(botJid, {
             jid: botJid,
             lid: botLid ? `${botLid}@lid` : null,
-            username: botName,
-            pushName: botName,
+            username: finalBotName,
+            pushName: finalBotName,
             phone_number: botPhoneNumber,
           });
           if (sessionName !== botJid) db.deleteBot(sessionName);
