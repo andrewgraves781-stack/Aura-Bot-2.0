@@ -1,5 +1,5 @@
 #Dami EMIRZM11 Bot#
-![Dami emirzm11 Bot](https://pin.it/3617mnAm6)
+[Dami emirzm11 Bot](https://pin.it/3617mnAm6
 Bot de WhatsApp para grupos y uso personal, construido con `@whiskeysockets/baileys` y un sistema modular de comandos.
 
 ## 📌 Descripción
