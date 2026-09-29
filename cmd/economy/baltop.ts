@@ -1,6 +1,6 @@
 import type { CommandContext } from "../../types/index.d.ts";
 import {
-  getGroupEconomyUsers,
+  getEconomyUser,
   formatMoney,
 } from "../../core/economyConfig.ts";
 import { db } from "../../core/AuraDB.ts";
@@ -9,7 +9,11 @@ export default {
   name: ["baltop", "topbal", "topcoins"],
   category: "economy",
   description: "Muestra el ranking de usuarios con más monedas.",
+  groupOnly: true,
   async run(ctx: CommandContext) {
+    if (!ctx.groupMeta) {
+      return ctx.reply("❌ Este comando solo funciona en grupos.");
+    }
     const pageSize = 10;
     const requestedPage = Number.parseInt(String(ctx.args?.[0] || "1"), 10);
     if (!Number.isInteger(requestedPage) || requestedPage < 1) {
@@ -45,25 +49,27 @@ export default {
           storedUser,
         );
     }
-    const rows = Object.entries(getGroupEconomyUsers(ctx.from))
-      .map(
-        ([jid, user]: [
-          string,
-          Partial<import("../../types/index.d.ts").EconomyUser>,
-        ]) => {
-          const number = jid.split("@")[0].split(":")[0];
-          const storedUser = usersByIdentity.get(number);
-          return {
-            jid: storedUser?.jid || "",
-            username: storedUser?.username || "Usuario",
-            number,
-            total: Number(user.bolsillo ?? 0) + Number(user.banco ?? 0),
-          };
-        },
-      )
-      .filter((row) => row.jid)
-      .filter((row) => row.number !== botNumber && row.number !== botId)
-      .filter((row) => row.total > 0)
+    const participants = Array.isArray(ctx.groupMeta.participants)
+      ? ctx.groupMeta.participants.filter((participant) => Boolean(participant?.id))
+      : [];
+    const rows = participants
+      .flatMap((participant) => {
+        const number = participant.id.split("@")[0].split(":")[0];
+        const storedUser = usersByIdentity.get(number);
+        if (!storedUser || number === botNumber || number === botId) {
+          return [];
+        }
+        const user = getEconomyUser(ctx.from, storedUser.jid);
+        const total = Number(user.bolsillo ?? 0) + Number(user.banco ?? 0);
+        return total > 0
+          ? [{
+              jid: storedUser.jid,
+              username: storedUser.username,
+              number,
+              total,
+            }]
+          : [];
+      })
       .sort((a, b) => b.total - a.total);
     if (!rows.length)
       return ctx.reply("⚠️ No hay usuarios con saldo para mostrar.");
