@@ -3,7 +3,7 @@ import {
   getGroupEconomyUsers,
   formatMoney,
 } from "../../core/economyConfig.ts";
-import { db } from "../../core/db.ts";
+import { db } from "../../core/AuraDB.ts";
 
 export default {
   name: ["baltop", "topbal", "topcoins"],

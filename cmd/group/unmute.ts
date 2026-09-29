@@ -5,6 +5,36 @@ function normalizeJid(jid: string): string {
   return String(jid || "").split("@")[0].split(":")[0];
 }
 
+function matchMutedUser(savedJid: string, targetJid: string): boolean {
+  const left = new Set<string>();
+  const right = new Set<string>();
+
+  for (const value of [savedJid, targetJid]) {
+    const raw = String(value || "").trim();
+    if (!raw) continue;
+
+    const variants = [
+      raw,
+      raw.split(":")[0],
+      raw.split("@")[0],
+      raw.replace(/@s\.whatsapp\.net$/i, ""),
+      raw.replace(/@lid$/i, ""),
+    ];
+
+    for (const variant of variants) {
+      if (!variant) continue;
+      const cleaned = normalizeJid(variant);
+      const normalized = cleaned.toLowerCase();
+      if (normalized) {
+        if (value === savedJid) left.add(normalized);
+        if (value === targetJid) right.add(normalized);
+      }
+    }
+  }
+
+  return [...left].some((value) => right.has(value));
+}
+
 export default {
   name: ["unmute", "desilenciar"],
   category: "group",
@@ -24,7 +54,9 @@ export default {
     
     // Normalizar JIDs para comparación
     const normalizedTarget = normalizeJid(target);
-    const isMuted = mutedUsers.some((jid: string) => normalizeJid(jid) === normalizedTarget);
+    const isMuted = mutedUsers.some((jid: string) =>
+      matchMutedUser(jid, normalizedTarget),
+    );
     
     if (!isMuted)
       return ctx.reply({
@@ -32,7 +64,9 @@ export default {
         mentions: [target],
       });
     ctx.db.setGroup(ctx.from, {
-      mutedUsers: mutedUsers.filter((jid: string) => normalizeJid(jid) !== normalizedTarget),
+      mutedUsers: mutedUsers.filter(
+        (jid: string) => !matchMutedUser(jid, normalizedTarget),
+      ),
     });
     return ctx.reply({
       text: `╭〔 🔊 ${fytBold("AURA REED")} 〕⬣\n┃ ✅ ${fytBold("DESILENCIADO")}\n╰━━━━━━━━━━━━⬣\n\n┃ > El usuario @${target.split("@")[0]} ya puede hablar.\n\n╰〔 ⚡ ${fytBold("SYSTEM INFO")} 〕⬣`,

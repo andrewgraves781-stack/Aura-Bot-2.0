@@ -10,7 +10,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 import type {
   CommandContext,
@@ -58,7 +57,7 @@ export default {
       const title = info.title || "Audio de YouTube";
       const file = await downloadToCache(info.dl);
       const { cost } = await prepareDownloadCharge(ctx, "document", file);
-      const caption = `╭〔 🎵 ${fytBold("YOUTUBE DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${info.author || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${info.duration || "??"}\n┃ > ${fytBold("Calidad")} › ${info.quality || "128k"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 🎵 ${fytBold("YOUTUBE DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${info.author || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${info.duration || "??"}\n┃ > ${fytBold("Calidad")} › ${info.quality || "128k"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const videoId = url.match(YT_ID)?.[1];
       const thumbnail = videoId
         ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
@@ -91,7 +90,7 @@ export default {
           ? error.message
           : "No se pudo descargar el audio.";
       return reply({
-        text: `❌ Error: ${message}`,
+        text: `${message}`,
       });
     }
   },

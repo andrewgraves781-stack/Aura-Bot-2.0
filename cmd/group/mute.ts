@@ -6,6 +6,36 @@ function normalizeJid(jid: string): string {
   return String(jid || "").split("@")[0].split(":")[0];
 }
 
+function matchMutedUser(savedJid: string, targetJid: string): boolean {
+  const left = new Set<string>();
+  const right = new Set<string>();
+
+  for (const value of [savedJid, targetJid]) {
+    const raw = String(value || "").trim();
+    if (!raw) continue;
+
+    const variants = [
+      raw,
+      raw.split(":")[0],
+      raw.split("@")[0],
+      raw.replace(/@s\.whatsapp\.net$/i, ""),
+      raw.replace(/@lid$/i, ""),
+    ];
+
+    for (const variant of variants) {
+      if (!variant) continue;
+      const cleaned = normalizeJid(variant);
+      const normalized = cleaned.toLowerCase();
+      if (normalized) {
+        if (value === savedJid) left.add(normalized);
+        if (value === targetJid) right.add(normalized);
+      }
+    }
+  }
+
+  return [...left].some((value) => right.has(value));
+}
+
 export default {
   name: ["mute", "silenciar"],
   category: "group",
@@ -30,13 +60,27 @@ export default {
         text: `╭〔 ❌ ${fytBold("AURA REED")} 〕⬣\n┃ ${fytBold("ACCIÓN PROHIBIDA")}\n╰━━━━━━━━━━━━⬣\n\n┃ > No puedes silenciar a un administrador.\n\n╰〔 ⚡ ${fytBold("SYSTEM ALERT")} 〕⬣`,
       });
     const mutedUsers = Array.isArray(group.mutedUsers) ? group.mutedUsers : [];
-    
-    // Normalizar JIDs para evitar duplicados
+
     const normalizedTarget = normalizeJid(target);
-    const isAlreadyMuted = mutedUsers.some((jid: string) => normalizeJid(jid) === normalizedTarget);
-    
-    if (!isAlreadyMuted) mutedUsers.push(target);
+    const isAlreadyMuted = mutedUsers.some((jid: string) =>
+      matchMutedUser(jid, normalizedTarget),
+    );
+
+    if (!isAlreadyMuted) {
+      mutedUsers.push(target);
+
+      if (target.endsWith("@lid")) {
+        const targetJid = ctx.groupMeta?.participants?.find(
+          (p: any) => p.lid === target
+        )?.id;
+        if (targetJid && !mutedUsers.includes(targetJid)) {
+          mutedUsers.push(targetJid);
+        }
+      }
+    }
+
     ctx.db.setGroup(ctx.from, { mutedUsers });
+    
     return ctx.reply({
       text: `╭〔 🔇 ${fytBold("AURA REED")} 〕⬣\n┃ 🛑 ${fytBold("USUARIO SILENCIADO")}\n╰━━━━━━━━━━━━⬣\n\n┃ > Los mensajes de @${target.split("@")[0]} serán\n┃ > eliminados automáticamente.\n\n╰〔 ⚡ ${fytBold("SYSTEM INFO")} 〕⬣`,
       mentions: [target],

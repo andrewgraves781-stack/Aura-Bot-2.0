@@ -14,7 +14,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
 
@@ -37,7 +36,7 @@ export default {
       const name = String(data.name || "Aplicación Android");
       const file = await downloadToCache(data.dl);
       const { cost } = await prepareDownloadCharge(ctx, "document", file);
-      const caption = `╭〔 🤖 ${fytBold("APK DOWNLOADER")} 〕━⬣\n\n┃ ➥ ${fytBold(name)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("ID App")} › ${data.package || "N/A"}\n┃ > ${fytBold("Tamaño")} › ${data.size || "N/A"}\n┃ > ${fytBold("Versión")} › ${data.lastUpdated || "N/A"}\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Tipo")} › Aplicación (APK)\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando APK...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 🤖 ${fytBold("APK DOWNLOADER")} 〕━⬣\n\n┃ ➥ ${fytBold(name)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("ID App")} › ${data.package || "N/A"}\n┃ > ${fytBold("Tamaño")} › ${data.size || "N/A"}\n┃ > ${fytBold("Versión")} › ${data.lastUpdated || "N/A"}\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Tipo")} › Aplicación (APK)\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando APK...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const hasPreview = data.banner
         ? await sendDownloadPreview({
             sock,
@@ -64,7 +63,7 @@ export default {
       const message =
         error instanceof Error ? error.message : "No se pudo descargar el APK.";
       return reply({
-        text: `❌ Error: ${message}`,
+        text: `${message}`,
       });
     }
   },

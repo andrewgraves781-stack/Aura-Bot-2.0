@@ -24,16 +24,20 @@ export default {
   async run(ctx: CommandContext) {
     const context = ctx.msg?.message?.extendedTextMessage?.contextInfo;
     const quoted = context?.quotedMessage;
-    const target = unwrap(quoted);
+    const target = unwrap(quoted) ?? unwrap(ctx.msg?.message);
     if (!target)
       return ctx.reply(
         `❗ Responde a un audio/video con ${ctx.usedPrefix ?? "."}shazam.`,
       );
     await ctx.react("⏳");
     try {
+      const mediaKey =
+        (quoted && (context?.stanzaId || ctx.msg?.key?.id)
+          ? { ...ctx.msg.key, id: context.stanzaId || ctx.msg.key.id }
+          : ctx.msg.key) || ctx.msg.key;
       const buffer = await downloadMediaMessage(
         {
-          key: ctx.msg.key,
+          key: mediaKey,
           message: target,
         } as import("@whiskeysockets/baileys").WAMessage,
         "buffer",

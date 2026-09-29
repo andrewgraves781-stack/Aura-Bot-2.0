@@ -20,7 +20,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 
 const API_KEY = DL_CONFIG.alya.API_KEY;
@@ -186,7 +185,7 @@ export default {
       caption += `┃ > ${fytBold("Duración")} › ${duration}\n`;
       caption += `┃ > ${fytBold("Vistas")} › ${fomatViewers(views)}\n`;
       caption += `┃ > ${fytBold("Calidad")} › ${quality}\n`;
-      caption += `┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n`;
+      caption += `┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n`;
       caption += `┃ > ${fytBold("Url")} › ${youtubeUrl}\n`;
       caption += `┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando audio...\n`;
       caption += `╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
@@ -237,7 +236,7 @@ export default {
     } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo descargar el audio."}`,
+        text: `${error instanceof Error ? error.message : String(error) || "No se pudo descargar el audio."}`,
       });
     }
   },

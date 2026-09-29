@@ -158,6 +158,8 @@ export interface GroupDbRow {
   self: number | null;
   topMsgUsers: string | null;
   catBlocked: string | null;
+  mutedUsers?: string | null;
+  medUsers?: string | null;
   welcome?: number | boolean | null;
   goodbye?: number | boolean | null;
   welcomeMessage?: string | null;

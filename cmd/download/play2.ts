@@ -10,7 +10,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 import type {
   CommandContext,
@@ -57,7 +56,7 @@ export default {
       const title = data.titulo || "Video de YouTube";
       const file = await downloadToCache(data.datos.url);
       const { cost } = await prepareDownloadCharge(ctx, "video", file);
-      const caption = `╭〔 🎬 ${fytBold("YOUTUBE VIDEO")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${data.canal || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${data.duracion || "??"}\n┃ > ${fytBold("Tamaño")} › ${data.datos.tamaño || "??"}\n┃ > ${fytBold("Tipo")} › Video MP4\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Enviando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 🎬 ${fytBold("YOUTUBE VIDEO")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Canal")} › ${data.canal || "Desconocido"}\n┃ > ${fytBold("Duración")} › ${data.duracion || "??"}\n┃ > ${fytBold("Tamaño")} › ${data.datos.tamaño || "??"}\n┃ > ${fytBold("Tipo")} › Video MP4\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Enviando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const hasPreview = data.miniatura
         ? await sendDownloadPreview({
             sock,
@@ -82,7 +81,7 @@ export default {
     } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error instanceof Error ? error.message : "No se pudo descargar el video."}`,
+        text: `${error instanceof Error ? error.message : "No se pudo descargar el video."}`,
       });
     }
   },

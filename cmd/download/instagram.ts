@@ -9,7 +9,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 const INSTAGRAM_URL =
   /(?:instagram\.com|instagr\.am)\/(?:reels?|p|tv|stories)\//i;
@@ -43,7 +42,7 @@ export default {
       if (video) {
         const file = await downloadToCache(video.url, 180000);
         const { cost } = await prepareDownloadCharge(ctx, mediaType, file);
-        const caption = `╭〔 📸 ${fytBold("INSTAGRAM VIDEO")} 〕━⬣\n\n┃ ➥ ${fytBold(data?.caption || "Sin título")}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Total")} › 1 video\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+        const caption = `╭〔 📸 ${fytBold("INSTAGRAM VIDEO")} 〕━⬣\n\n┃ ➥ ${fytBold(data?.caption || "Sin título")}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Total")} › 1 video\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
         await reply({
           video: { url: file },
           mimetype: "video/mp4",
@@ -58,7 +57,7 @@ export default {
           cost = (await prepareDownloadCharge(ctx, mediaType, file)).cost;
           files.push(file);
         }
-        const caption = `╭〔 📸 ${fytBold("INSTAGRAM POST")} 〕━⬣\n\n┃ ➥ ${fytBold(data?.caption || "Sin título")}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Total")} › ${images.length} imágenes\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+        const caption = `╭〔 📸 ${fytBold("INSTAGRAM POST")} 〕━⬣\n\n┃ ➥ ${fytBold(data?.caption || "Sin título")}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Total")} › ${images.length} imágenes\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
         for (const [index, file] of files.entries()) {
           await reply({
             image: { url: file },
@@ -71,7 +70,7 @@ export default {
     } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error instanceof Error ? error.message : "No se pudo descargar Instagram."}`,
+        text: `${error instanceof Error ? error.message : "No se pudo descargar Instagram."}`,
       });
     }
   },

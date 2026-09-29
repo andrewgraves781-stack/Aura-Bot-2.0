@@ -10,7 +10,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 import type {
   CommandContext,
@@ -54,7 +53,7 @@ export default {
       const title = data.title || "Video de TikTok";
       const file = await downloadToCache(videoUrl, 180000);
       const { cost } = await prepareDownloadCharge(ctx, "document", file);
-      const caption = `╭〔 🎥 ${fytBold("TIKTOK DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Autor")} › ${author}\n┃ > ${fytBold("Vistas")} › ${formatCount(data.stats?.views || data.play_count)}\n┃ > ${fytBold("Likes")} › ${formatCount(data.stats?.likes || data.digg_count)}\n┃ > ${fytBold("Comentarios")} › ${formatCount(data.stats?.comment || data.comment_count)}\n┃ > ${fytBold("Compartidos")} › ${formatCount(data.stats?.share || data.share_count)}\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 🎥 ${fytBold("TIKTOK DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Autor")} › ${author}\n┃ > ${fytBold("Vistas")} › ${formatCount(data.stats?.views || data.play_count)}\n┃ > ${fytBold("Likes")} › ${formatCount(data.stats?.likes || data.digg_count)}\n┃ > ${fytBold("Comentarios")} › ${formatCount(data.stats?.comment || data.comment_count)}\n┃ > ${fytBold("Compartidos")} › ${formatCount(data.stats?.share || data.share_count)}\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       await reply({
         document: { url: file },
         mimetype: "video/mp4",
@@ -70,7 +69,7 @@ export default {
           ? error.message
           : "No se pudo descargar el video.";
       return reply({
-        text: `❌ Error: ${message}`,
+        text: `${message}`,
       });
     }
   },

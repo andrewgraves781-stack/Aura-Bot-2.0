@@ -10,7 +10,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
 
@@ -62,7 +61,7 @@ export default {
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
       });
       const { cost } = await prepareDownloadCharge(ctx, "video", file);
-      const caption = `╭〔 🎥 ${fytBold("FACEBOOK VIDEO")} 〕━⬣\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Calidad")} › ${quality}\n┃ > ${fytBold("Tipo")} › Video MP4\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 🎥 ${fytBold("FACEBOOK VIDEO")} 〕━⬣\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Calidad")} › ${quality}\n┃ > ${fytBold("Tipo")} › Video MP4\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando video...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       await reply({
         video: { url: file },
         mimetype: "video/mp4",
@@ -74,7 +73,7 @@ export default {
     } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo descargar el video."}`,
+        text: `${error instanceof Error ? error.message : String(error) || "No se pudo descargar el video."}`,
       });
     }
   },

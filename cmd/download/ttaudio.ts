@@ -22,7 +22,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 
 const execFileAsync = promisify(execFile);
@@ -86,7 +85,7 @@ export default {
         searchResult?.author?.nickname ||
         "Desconocido";
       const { cost } = await prepareDownloadCharge(ctx, "audio", output);
-      const caption = `╭〔 🎵 ${fytBold("TIKTOK AUDIO")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Autor")} › ${author}\n┃ > ${fytBold("Vistas")} › ${formatCount(data.stats?.views || data.play_count || searchResult?.stats?.views)}\n┃ > ${fytBold("Likes")} › ${formatCount(data.stats?.likes || data.digg_count || searchResult?.stats?.likes)}\n┃ > ${fytBold("Comentarios")} › ${formatCount(data.stats?.comment || data.comment_count || searchResult?.stats?.comment)}\n┃ > ${fytBold("Compartidos")} › ${formatCount(data.stats?.share || data.share_count || searchResult?.stats?.share)}\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Tipo")} › Audio MP3\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando audio...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 🎵 ${fytBold("TIKTOK AUDIO")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Autor")} › ${author}\n┃ > ${fytBold("Vistas")} › ${formatCount(data.stats?.views || data.play_count || searchResult?.stats?.views)}\n┃ > ${fytBold("Likes")} › ${formatCount(data.stats?.likes || data.digg_count || searchResult?.stats?.likes)}\n┃ > ${fytBold("Comentarios")} › ${formatCount(data.stats?.comment || data.comment_count || searchResult?.stats?.comment)}\n┃ > ${fytBold("Compartidos")} › ${formatCount(data.stats?.share || data.share_count || searchResult?.stats?.share)}\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Tipo")} › Audio MP3\n┃ > ${fytBold("Url")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando audio...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       await reply({ text: caption });
       await reply({
         audio: await readFile(output),
@@ -102,7 +101,7 @@ export default {
           ? error.message
           : "No se pudo convertir el audio.";
       return reply({
-        text: `❌ Error: ${message}`,
+        text: `${message}`,
       });
     } finally {
       await unlink(output).catch(() => undefined);

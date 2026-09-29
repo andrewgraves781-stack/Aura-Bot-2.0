@@ -1,5 +1,6 @@
-import { db } from "./db.ts";
+import { db } from "./AuraDB.ts";
 import { getFileBytes } from "./downloadUtils.ts";
+import { NOT_HAVE_COINS } from "./socketText.ts";
 import type {
   CommandContext,
   EconomyUser,
@@ -276,7 +277,7 @@ export function getGroupEconomyUsers(
 }
 
 export function formatCoins(value: number): string {
-  return Math.max(0, Math.floor(Number(value) || 0)).toLocaleString("es-ES");
+  return Math.max(0, Math.floor(Number(value) || 0)).toLocaleString("es-EN");
 }
 
 export const DEFAULT_BOT_CURRENCY: BotCurrency = {
@@ -376,26 +377,26 @@ export const DOWNLOAD_COST_RANGES: Record<
   { min: number; max: number; refMinBytes: number; refMaxBytes: number }
 > = {
   audio: {
-    min: 200,
-    max: 1000,
+    min: 1000,
+    max: 2000,
     refMinBytes: 1 * 1024 * 1024,
     refMaxBytes: 150 * 1024 * 1024,
   },
   video: {
-    min: 500,
-    max: 2000,
+    min: 1500,
+    max: 3500,
     refMinBytes: 2 * 1024 * 1024,
     refMaxBytes: 250 * 1024 * 1024,
   },
   image: {
-    min: 100,
-    max: 300,
+    min: 1000,
+    max: 1500,
     refMinBytes: 200 * 1024,
     refMaxBytes: 30 * 1024 * 1024,
   },
   document: {
-    min: 50,
-    max: 2000,
+    min: 550,
+    max: 5000,
     refMinBytes: 1 * 1024,
     refMaxBytes: 2 * 1024 * 1024 * 1024,
   },
@@ -451,15 +452,27 @@ export async function prepareDownloadCharge(
   bag._downloadMediaType = type;
   bag._downloadSize = Number(bag._downloadSize || 0) + size;
   const cost = getDownloadCost(type, bag._downloadSize);
-  if (!ctx.isMod) {
-    const currentBalance = getBolsillo(ctx.sender);
-    if (currentBalance < cost) {
-      bag._downloadSize = Math.max(0, Number(bag._downloadSize) - size);
-      bag._downloadSuccess = false;
-      throw new Error(
-        `Saldo insuficiente. Necesitas ${formatMoney(cost, ctx)} y tienes ${formatMoney(currentBalance, ctx)}.`,
-      );
-    }
+  const currentBalance = getBolsillo(ctx.sender);
+  if (currentBalance < cost) {
+    bag._downloadSize = Math.max(0, Number(bag._downloadSize) - size);
+    bag._downloadSuccess = false;
+    const currency = getBotCurrency(ctx);
+    const labels: Record<DownloadMediaType, string> = {
+      audio: "Audios",
+      video: "Videos",
+      image: "Imágenes",
+      document: "Documentos",
+    };
+    const requiredAmount = formatMoney(cost, currency);
+    throw new Error(
+      NOT_HAVE_COINS({
+        userBalance: formatMoney(currentBalance, currency),
+        typeMedia: labels[type],
+        minAmount: requiredAmount,
+        currencyName: currency.name,
+        requiredAmount,
+      }),
+    );
   }
   return { cost, size };
 }

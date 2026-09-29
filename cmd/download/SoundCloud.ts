@@ -18,7 +18,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 
 let cachedClientId: string | null = null;
@@ -205,7 +204,7 @@ export default {
       caption += `┃ > ${fytBold("Vistas")} › ${formatNumber(track.playback_count)}\n`;
       caption += `┃ > ${fytBold("Likes")} › ${formatNumber(track.likes_count)}\n`;
       caption += `┃ > ${fytBold("Tipo")} › Audio MP3\n`;
-      caption += `┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n`;
+      caption += `┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n`;
       caption += `┃ > ${fytBold("URL")} › ${track.permalink_url || query}\n`;
       caption += `┣━━━━━━━━━━━━⬣\n┃ ⏳️ Descargando Audio...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
 
@@ -252,7 +251,7 @@ export default {
     } catch (error: unknown) {
       await react("❌");
       await reply({
-        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo descargar el audio."}`,
+        text: `${error instanceof Error ? error.message : String(error) || "No se pudo descargar el audio."}`,
       });
     }
   },

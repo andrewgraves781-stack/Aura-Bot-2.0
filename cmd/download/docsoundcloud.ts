@@ -12,7 +12,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 
 let cachedClientId = "";
@@ -95,7 +94,7 @@ export default {
       const title = track.title || "SoundCloud";
       const file = await downloadToCache(stream.url);
       const { cost } = await prepareDownloadCharge(ctx, "document", file);
-      const caption = `╭〔 🎵 ${fytBold("SOUNDCLOUD DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${track.user?.username || "N/A"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 🎵 ${fytBold("SOUNDCLOUD DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${track.user?.username || "N/A"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const thumbnail = track.artwork_url?.replace("large", "t500x500");
       const hasPreview = thumbnail
         ? await sendDownloadPreview({
@@ -121,7 +120,7 @@ export default {
     } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo descargar SoundCloud."}`,
+        text: `${error instanceof Error ? error.message : String(error) || "No se pudo descargar SoundCloud."}`,
       });
     }
   },

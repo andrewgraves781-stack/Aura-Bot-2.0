@@ -1,11 +1,11 @@
 {
   "name": "aura-reed-bot",
-  "version": "2.0.0",
+  "version": "2.2.3",
   "description": "",
   "type": "module",
   "main": "main.ts",
   "scripts": {
-    "start": "NODE_OPTIONS='--expose-gc --max-old-space-size=512' tsx main.ts",
+    "start": "tsx main.ts",
     "prev": "node dist/main.js",
     "test": "tsx --watch main.ts",
     "build": "tsc --noEmit false --outDir dist",

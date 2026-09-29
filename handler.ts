@@ -20,7 +20,7 @@ import {
   NOT_PREMIUM,
   NOT_HAVE_COINS
 } from "./core/socketText.ts";
-import { db } from "./core/db.ts";
+import { db } from "./core/AuraDB.ts";
 import { handleGroupStatus, handleGroupToxic } from "./core/groupModeration.ts";
 import {
   checkDownloadCoins,
@@ -37,9 +37,7 @@ import type {
 } from "@whiskeysockets/baileys";
 import type {
   ExtendedWASocket,
-  IDatabase,
   CommandPlugin,
-  CommandContext,
   ButtonItem,
   OptionSection,
   OptionRow,
@@ -729,16 +727,62 @@ export async function handleMessage(
       // Verificar si el usuario está silenciado y eliminar su mensaje
       if (isGroup && !isCmd && !isBotUser && !isMod && !isAdmin) {
         const mutedUsers = groupData?.mutedUsers;
+
         if (Array.isArray(mutedUsers) && mutedUsers.length > 0) {
+          const participantVariants = new Set<string>();
+          for (const participant of groupMeta?.participants ?? []) {
+            const candidateIds = [participant.id, participant.lid].filter(Boolean) as string[];
+            for (const candidate of candidateIds) {
+              const cleaned = cleanJid(candidate);
+              if (!cleaned) continue;
+              const local = cleaned.split("@")[0].split(":")[0];
+              participantVariants.add(cleaned);
+              participantVariants.add(local);
+            }
+          }
+
+          const senderVariants = new Set<string>();
+          const rawParticipantCandidates = [
+            msg.key?.participant,
+            msg.participant,
+            sender,
+            senderLid,
+            senderNum,
+            sender.split("@")[0],
+            senderLid.split("@")[0],
+          ];
+
+          for (const candidate of rawParticipantCandidates) {
+            const normalized = cleanJid(String(candidate || ""));
+            if (normalized) {
+              senderVariants.add(normalized);
+              senderVariants.add(normalized.split("@")[0]);
+            }
+          }
+
           const isMuted = mutedUsers.some((mutedJid: string) => {
-            const cleanMuted = String(mutedJid || "").split("@")[0].split(":")[0];
-            const cleanSender = sender.split("@")[0].split(":")[0];
-            return cleanMuted === cleanSender || mutedJid === sender;
+            const mutedVariants = new Set<string>();
+            for (const candidate of [String(mutedJid || ""), cleanJid(String(mutedJid || "")), String(mutedJid || "").split("@")[0], String(mutedJid || "").split(":")[0]]) {
+              if (!candidate) continue;
+              const normalized = cleanJid(candidate);
+              mutedVariants.add(candidate);
+              if (normalized) {
+                mutedVariants.add(normalized);
+                mutedVariants.add(normalized.split("@")[0]);
+              }
+            }
+
+            const directHit = Array.from(mutedVariants).some((value) => senderVariants.has(value));
+            const rosterHit = Array.from(mutedVariants).some((value) => participantVariants.has(value));
+            return directHit || rosterHit;
           });
-          
+
           if (isMuted) {
             try {
-              await sock.sendMessage(from, { delete: msg.key });
+              const messageKey = msg.key;
+              if (messageKey && messageKey.id) {
+                await sock.sendMessage(from, { delete: messageKey });
+              }
               return;
             } catch (deleteError) {
               logger.warn?.(`Error al eliminar mensaje de usuario silenciado: ${String(deleteError)}`);
@@ -1117,19 +1161,19 @@ export async function handleMessage(
 
       const coinCheck = checkDownloadCoins(sender, mediaType);
       (ctx as Record<string, unknown>)._downloadMediaType = mediaType;
-      if (!coinCheck.allowed && !isMod) {
+      if (!coinCheck.allowed) {
         const currency = getBotCurrency(ctx.botJid);
         const labels: Record<DownloadMediaType, string> = {
-          audio: `Audio (200 - 1000 ${currency.name})`,
-          video: `Video (500 - 2000 ${currency.name})`,
-          image: `Imágenes (100 - 300 ${currency.name})`,
-          document: `Documentos (50 - 2000 ${currency.name})`,
+          audio: "Audios",
+          video: "Videos",
+          image: "Imágenes",
+          document: "Documentos",
         };
         const requiredAmount = formatMoney(coinCheck.minCost, currency);
         const userBalance = formatMoney(coinCheck.currentBalance, currency);
         const typeMedia = labels[mediaType]
         const minAmount = formatMoney(coinCheck.minCost, currency)
-        const currencyName = currency.name.toUpperCase()
+        const currencyName = currency.name
 
         return ctx.reply({text: NOT_HAVE_COINS({
           typeMedia,

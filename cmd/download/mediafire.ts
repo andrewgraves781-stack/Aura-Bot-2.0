@@ -6,7 +6,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 
 const HEADERS = {
@@ -58,7 +57,7 @@ export default {
         extension === "apk"
           ? "application/vnd.android.package-archive"
           : "application/octet-stream";
-      const caption = `╭〔 📦 ${fytBold("MEDIAFIRE DL")} 〕━⬣\n\n┃ ➥ ${fytBold(name)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Tamaño")} › ${data.size}\n┃ > ${fytBold("Extensión")} › .${extension.toUpperCase()}\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Link")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando archivo...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 📦 ${fytBold("MEDIAFIRE DL")} 〕━⬣\n\n┃ ➥ ${fytBold(name)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Tamaño")} › ${data.size}\n┃ > ${fytBold("Extensión")} › .${extension.toUpperCase()}\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Link")} › ${url}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando archivo...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       await reply({ text: caption });
       await reply({ document: { url: file }, mimetype: mime, fileName: name });
       confirmDownloadCharge(ctx);
@@ -66,7 +65,7 @@ export default {
     } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error instanceof Error ? error.message : String(error) || "No se pudo descargar el archivo."}`,
+        text: `${error instanceof Error ? error.message : String(error) || "No se pudo descargar el archivo."}`,
       });
     }
   },

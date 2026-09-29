@@ -134,6 +134,25 @@ export interface ShazamRecognizeResponse {
   success?: boolean;
   track?: ShazamTrack;
   message?: string;
+  noMatch?: boolean;
+}
+
+export interface AuddRecognizeResult {
+  title?: string;
+  artist?: string;
+  album?: string;
+  release_date?: string;
+  label?: string;
+  song_link?: string;
+  [key: string]: string | undefined;
+}
+
+export interface AuddRecognizeResponse {
+  status?: string;
+  result?: AuddRecognizeResult;
+  error?: {
+    message?: string;
+  };
 }
 
 export interface BadWordLevel {

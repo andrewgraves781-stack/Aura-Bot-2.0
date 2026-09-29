@@ -65,6 +65,7 @@ db_instance.exec(`
     jid TEXT PRIMARY KEY,
     group_id TEXT,
     group_name TEXT,
+    mutedUsers TEXT DEFAULT '[]',
     antilink INTEGER DEFAULT 0,
     antiCalls INTEGER DEFAULT 0,
     antiToxic INTEGER DEFAULT 0,
@@ -116,17 +117,30 @@ for (const column of [
     db_instance.exec(`ALTER TABLE bots ADD COLUMN ${column[0]} ${column[1]}`);
 }
 
+const groupsMeta = db_instance.prepare("PRAGMA table_info('groups')").all() as Array<{ name: string }>;
+const hasMutedUsers = groupsMeta.some((column) => column.name === "mutedUsers");
+const hasLegacyMedUsers = groupsMeta.some((column) => column.name === "medUsers");
+if (!hasMutedUsers && hasLegacyMedUsers) {
+  db_instance.exec("ALTER TABLE groups RENAME COLUMN medUsers TO mutedUsers");
+}
+
 for (const [table, column, definition] of [
   ["groups", "prefix", "TEXT"],
   ["groups", "self", "INTEGER DEFAULT 0"],
   ["groups", "onlyAdmin", "INTEGER DEFAULT 0"],
   ["groups", "topMsgUsers", "TEXT DEFAULT '[]'"],
+  ["groups", "topCmdUsers", "TEXT DEFAULT '[]'"],
+  ["groups", "userWarns", "TEXT DEFAULT '{}'"],
   ["groups", "catBlocked", "TEXT DEFAULT '[\"nsfw\"]'"],
+  ["groups", "mutedUsers", "TEXT DEFAULT '[]'"],
   ["groups", "botOnline", "INTEGER DEFAULT 1"],
+  ["groups", "data", "TEXT DEFAULT '{}'"],
   ["bots", "modPrefix", "TEXT"],
   ["bots", "modSelf", "INTEGER DEFAULT 0"],
   ["bots", "currency", "TEXT DEFAULT 'AuraCoins'"],
   ["bots", "currencySymbol", "TEXT DEFAULT '₡'"],
+  ["bots", "data", "TEXT DEFAULT '{}'"],
+  ["users", "data", "TEXT DEFAULT '{}'"],
 ] as const) {
   const exists = db_instance
     .prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`)
@@ -154,10 +168,10 @@ const stmts = {
 
   getGroup: db_instance.prepare("SELECT * FROM groups WHERE jid = ?"),
   insertGroup: db_instance.prepare(
-    "INSERT INTO groups (jid, group_id, group_name, antilink, antiCalls, antiToxic, antiSpam, antiStatus, onlyAdmin, prefix, self, topMsgUsers, catBlocked, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO groups (jid, group_id, group_name, antilink, antiCalls, antiToxic, antiSpam, antiStatus, onlyAdmin, prefix, self, topMsgUsers, catBlocked, mutedUsers, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ),
   updateGroup: db_instance.prepare(
-    "UPDATE groups SET group_id = ?, group_name = ?, antilink = ?, antiCalls = ?, antiToxic = ?, antiSpam = ?, antiStatus = ?, onlyAdmin = ?, prefix = ?, self = ?, topMsgUsers = ?, catBlocked = ?, data = ? WHERE jid = ?",
+    "UPDATE groups SET group_id = ?, group_name = ?, antilink = ?, antiCalls = ?, antiToxic = ?, antiSpam = ?, antiStatus = ?, onlyAdmin = ?, prefix = ?, self = ?, topMsgUsers = ?, catBlocked = ?, mutedUsers = ?, data = ? WHERE jid = ?",
   ),
   getAllGroups: db_instance.prepare(
     "SELECT jid, group_id, group_name, antilink, antiCalls, antiToxic, antiSpam, onlyAdmin, prefix, self, topMsgUsers, data FROM groups",
@@ -336,6 +350,7 @@ function getGroup(jid: string): DatabaseGroup {
       welcomeMessage: null,
       goodbyeMessage: null,
       topMsgUsers: [],
+      mutedUsers: [],
       data: {},
     };
 
@@ -353,6 +368,7 @@ function getGroup(jid: string): DatabaseGroup {
       defaultGroup.self,
       JSON.stringify(defaultGroup.topMsgUsers),
       JSON.stringify(defaultGroup.catBlocked),
+      JSON.stringify(defaultGroup.mutedUsers),
       JSON.stringify(defaultGroup.data),
     );
 
@@ -361,6 +377,10 @@ function getGroup(jid: string): DatabaseGroup {
 
   const jsonData = safeJson<Record<string, unknown>>(
     row.data as string | undefined,
+  );
+  const storedMutedUsers = safeJsonArray(
+    (row.mutedUsers ?? row.medUsers ?? jsonData.mutedUsers ?? jsonData.medUsers) as
+      string | undefined,
   );
   const storedTopMsgUsers = safeJson<TopMsgUser[]>(
     (row.topMsgUsers ?? jsonData.topMsgUsers) as string | undefined,
@@ -401,6 +421,7 @@ function getGroup(jid: string): DatabaseGroup {
     goodbyeMessage: (row.goodbyeMessage ?? jsonData.goodbyeMessage ?? null) as
       string | null,
     topMsgUsers: hasPreviousWeek ? [] : storedTopMsgUsers,
+    mutedUsers: storedMutedUsers,
     data: jsonData,
   };
 }
@@ -564,9 +585,17 @@ export const db: IDatabase = {
     const key = normalizeJid(jid);
     const currentData = getGroup(key);
     const merged = { ...currentData, ...dataObject };
+    const mutedUsers = Array.isArray(merged.mutedUsers)
+      ? merged.mutedUsers
+      : Array.isArray((merged.data as Record<string, unknown> | undefined)?.mutedUsers)
+        ? ((merged.data as Record<string, unknown>).mutedUsers as string[])
+        : Array.isArray((merged.data as Record<string, unknown> | undefined)?.medUsers)
+          ? ((merged.data as Record<string, unknown>).medUsers as string[])
+          : [];
     const payload = {
       ...merged.data,
       ...merged,
+      mutedUsers,
     };
 
     delete payload.data;
@@ -591,6 +620,7 @@ export const db: IDatabase = {
         JSON.stringify(
           Array.isArray(merged.catBlocked) ? merged.catBlocked : ["nsfw"],
         ),
+        JSON.stringify(mutedUsers),
         JSON.stringify(payload),
       );
       return;
@@ -619,6 +649,7 @@ export const db: IDatabase = {
           ? merged.catBlocked
           : safeJsonArray((row.catBlocked as string | undefined) ?? '["nsfw"]'),
       ),
+      JSON.stringify(mutedUsers),
       JSON.stringify(payload),
       key,
     );

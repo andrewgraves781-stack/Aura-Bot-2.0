@@ -10,7 +10,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 import type { CommandContext, SpotifyResponse } from "../../types/index.d.ts";
 
@@ -45,7 +44,7 @@ export default {
           : `https://open.spotify.com/search/${encodeURIComponent(title)}`);
       const file = await downloadToCache(download);
       const { cost } = await prepareDownloadCharge(ctx, "document", file);
-      const caption = `╭〔 🎵 ${fytBold("SPOTIFY DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${song.artist || "Desconocido"}\n┃ > ${fytBold("Álbum")} › ${song.album || "Desconocido"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${originalUrl}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
+      const caption = `╭〔 🎵 ${fytBold("SPOTIFY DOCUMENT")} 〕━⬣\n\n┃ ➥ ${fytBold(title)}\n\n┣━━━━━━━━━━━━⬣\n┃ > ${fytBold("Artista")} › ${song.artist || "Desconocido"}\n┃ > ${fytBold("Álbum")} › ${song.album || "Desconocido"}\n┃ > ${fytBold("Tipo")} › Documento MP3\n┃ > ${fytBold("Costo")} › ${formatMoney(cost, ctx)}\n┃ > ${fytBold("Url")} › ${originalUrl}\n┣━━━━━━━━━━━━⬣\n┃ ⏳ Descargando documento...\n╰━━〔 ⚡ ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       const cover = song.coverHd || song.cover;
       const hasPreview = cover
         ? await sendDownloadPreview({
@@ -75,7 +74,7 @@ export default {
           ? error.message
           : "No se pudo descargar Spotify.";
       return reply({
-        text: `❌ Error: ${message}`,
+        text: `${message}`,
       });
     }
   },

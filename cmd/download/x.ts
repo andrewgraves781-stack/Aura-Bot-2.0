@@ -11,7 +11,6 @@ import {
   prepareDownloadCharge,
   confirmDownloadCharge,
   formatMoney,
-  getBotCurrency,
 } from "../../core/economyConfig.ts";
 
 const API = DL_CONFIG.alya.BASE_URL.replace(/\/+$/, "");
@@ -91,7 +90,7 @@ export default {
         file,
       );
       let caption = `⬣〔 ${fytBold("TWITTER DOWNLOAD")} 〕⬣`;
-      caption += `\n\n${fytBold(getBotCurrency(ctx).name)} › ${formatMoney(cost, ctx)}`;
+      caption += `\n\n${fytBold("Costo")} › ${formatMoney(cost, ctx)}`;
       caption += `\n\n╰━━〔 ${fytBold("SYSTEM ACTIVE")} 〕━━⬣`;
       if (isVideo) {
         await reply({
@@ -108,7 +107,7 @@ export default {
     } catch (error: unknown) {
       await react("❌");
       return reply({
-        text: `❌ Error: ${error instanceof Error ? error.message : "No se pudo descargar Twitter/X."}`,
+        text: `${error instanceof Error ? error.message : "No se pudo descargar Twitter/X."}`,
       });
     }
   },

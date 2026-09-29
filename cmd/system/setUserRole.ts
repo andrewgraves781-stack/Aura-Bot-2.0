@@ -1,7 +1,7 @@
 import type { proto } from "@whiskeysockets/baileys";
 import type { CommandContext } from "../../types/index.d.ts";
 import { jidNormalizedUser } from "@whiskeysockets/baileys";
-import { db } from "../../core/db.ts";
+import { db } from "../../core/AuraDB.ts";
 import { fytBold } from "../../core/socketText.ts";
 
 const roles = ["user", "mod", "coowner", "owner"];
