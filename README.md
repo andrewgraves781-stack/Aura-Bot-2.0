@@ -1,6 +1,6 @@
-# Aura Reed Bot
+# Dami emirzm11 Bot #
 
-![Aura Reed Bot](https://cdn.dix.lat/me/izijnp-c91x-ozzy3t-433130.jpg)
+![Dami emirzm11 Bot](https://imgur.com/a/YZCXcPu)
 
 Bot de WhatsApp para grupos y uso personal, construido con `@whiskeysockets/baileys` y un sistema modular de comandos.
 
